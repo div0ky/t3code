@@ -110,24 +110,69 @@ async function dispatch(
   }
   mirror.discard(environmentId, entry);
   publish();
+  if (options.reportFailure) {
+    toastManager.add({
+      type: "error",
+      title: "Could not update folders",
+      description: "This server may need an update. Your change was not saved.",
+    });
+  }
   return false;
 }
 
+const canUpdateFolders = (environmentId: EnvironmentId) =>
+  appAtomRegistry.get(serverEnvironment.updateSidebarFolders.permissionAtom(environmentId));
+
+function dispatchUserAction(environmentId: EnvironmentId, operation: SidebarFolderOperation) {
+  if (canUpdateFolders(environmentId)) {
+    void dispatch(environmentId, operation);
+    return true;
+  }
+  toastManager.add({
+    type: "error",
+    title: "Folders unavailable",
+    description: "This connection cannot change folders in this environment.",
+  });
+  return false;
+}
+
+// The hosted app has no primary environment, so the first connected one holds threadless folders.
+const homeEnvironmentId = (configs: ServerConfigs) =>
+  readPrimaryEnvironmentId() ?? configs.keys().next().value ?? null;
+
 let importingLegacyFolders = false;
+// Config pushes retrigger the import, so a server that rejected it waits for the next launch.
+const rejectedImportEnvironmentIds = new Set<EnvironmentId>();
+
+async function importEnvironmentFolders(
+  environmentId: EnvironmentId,
+  operations: readonly SidebarFolderOperation[],
+) {
+  for (const operation of operations) {
+    if (!(await dispatch(environmentId, operation, { reportFailure: false }))) return false;
+  }
+  return true;
+}
 
 async function importLegacyFolders(configs: ServerConfigs) {
-  const primaryEnvironmentId = readPrimaryEnvironmentId();
-  if (importingLegacyFolders || primaryEnvironmentId === null) return;
+  const home = homeEnvironmentId(configs);
+  if (importingLegacyFolders || home === null) return;
   importingLegacyFolders = true;
   try {
     for (const environmentId of configs.keys()) {
       const legacy = parseLegacySidebarFolders(readJson(LEGACY_STORAGE_KEY));
       if (legacy === null) return;
-      if (legacy.importedEnvironmentIds.includes(environmentId)) continue;
-      const plan = planLegacySidebarFolderImport(legacy, environmentId, primaryEnvironmentId);
-      for (const operation of plan.operations) {
-        // An older server rejects this; the local copy stays for a later attempt.
-        if (!(await dispatch(environmentId, operation, { reportFailure: false }))) return;
+      if (
+        legacy.importedEnvironmentIds.includes(environmentId) ||
+        rejectedImportEnvironmentIds.has(environmentId) ||
+        !canUpdateFolders(environmentId)
+      ) {
+        continue;
+      }
+      const plan = planLegacySidebarFolderImport(legacy, environmentId, home);
+      if (!(await importEnvironmentFolders(environmentId, plan.operations))) {
+        rejectedImportEnvironmentIds.add(environmentId);
+        continue;
       }
       for (const folderId of plan.collapsedFolderIds) collapsedFolderIds.add(folderId);
       saveCollapsed();
@@ -144,16 +189,18 @@ export const useSidebarFoldersStore = create<SidebarFoldersStore>((_set, get) =>
   folderIdByThreadKey: {},
   environmentIdByFolderId: {},
   createFolder: (environmentId) => {
-    const target = environmentId ?? readPrimaryEnvironmentId();
+    const target =
+      environmentId ?? homeEnvironmentId(appAtomRegistry.get(environmentServerConfigsAtom));
     if (target === null) return null;
     const folderId = randomUUID();
-    void dispatch(target, { action: "create", folderId, name: "New folder" });
-    return folderId;
+    return dispatchUserAction(target, { action: "create", folderId, name: "New folder" })
+      ? folderId
+      : null;
   },
   renameFolder: (folderId, name) => {
     const environmentId = get().environmentIdByFolderId[folderId];
     if (environmentId !== undefined)
-      void dispatch(environmentId, { action: "rename", folderId, name });
+      dispatchUserAction(environmentId, { action: "rename", folderId, name });
   },
   toggleFolder: (folderId) => {
     if (!collapsedFolderIds.delete(folderId)) collapsedFolderIds.add(folderId);
@@ -163,8 +210,8 @@ export const useSidebarFoldersStore = create<SidebarFoldersStore>((_set, get) =>
   deleteFolder: (folderId) => {
     const environmentId = get().environmentIdByFolderId[folderId];
     if (environmentId === undefined) return;
+    if (!dispatchUserAction(environmentId, { action: "delete", folderId })) return;
     if (collapsedFolderIds.delete(folderId)) saveCollapsed();
-    void dispatch(environmentId, { action: "delete", folderId });
   },
   moveThread: (threadKey, folderId) => {
     const ref = parseScopedThreadKey(threadKey);
@@ -177,7 +224,7 @@ export const useSidebarFoldersStore = create<SidebarFoldersStore>((_set, get) =>
       });
       return;
     }
-    void dispatch(ref.environmentId, {
+    dispatchUserAction(ref.environmentId, {
       action: "move_threads",
       threadIds: [ref.threadId],
       folderId,

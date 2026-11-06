@@ -37,14 +37,14 @@ export function parseLegacySidebarFolders(value: unknown): LegacySidebarFolders 
 
 /**
  * Folders used to span environments on one client. Each environment now gets its share of a folder,
- * and threadless folders go to the primary. `remaining` is null once nothing is left to import.
+ * and threadless folders go to the home environment. `remaining` is null once nothing is left to import.
  */
 export function planLegacySidebarFolderImport(
   legacy: LegacySidebarFolders,
   environmentId: EnvironmentId,
-  primaryEnvironmentId: EnvironmentId,
+  homeEnvironmentId: EnvironmentId,
 ) {
-  const isPrimary = environmentId === primaryEnvironmentId;
+  const isHome = environmentId === homeEnvironmentId;
   const threadIdsByFolderId = new Map<string, ThreadId[]>();
   const folderIdByThreadKey: Record<string, string> = {};
   for (const [key, folderId] of Object.entries(legacy.folderIdByThreadKey)) {
@@ -62,8 +62,8 @@ export function planLegacySidebarFolderImport(
   const collapsedFolderIds: string[] = [];
   for (const folder of legacy.folders) {
     const threadIds = threadIdsByFolderId.get(folder.id) ?? [];
-    if (threadIds.length === 0 && !isPrimary) continue;
-    const folderId = isPrimary ? folder.id : `${folder.id}:${environmentId}`;
+    if (threadIds.length === 0 && !isHome) continue;
+    const folderId = isHome ? folder.id : `${folder.id}:${environmentId}`;
     operations.push({ action: "create", folderId, name: folder.name });
     if (threadIds.length > 0) operations.push({ action: "move_threads", threadIds, folderId });
     if (folder.collapsed) collapsedFolderIds.push(folderId);
@@ -71,7 +71,7 @@ export function planLegacySidebarFolderImport(
   const importedEnvironmentIds = [...legacy.importedEnvironmentIds, environmentId];
   const liveFolderIds = new Set(legacy.folders.map((folder) => folder.id));
   const done =
-    importedEnvironmentIds.includes(primaryEnvironmentId) &&
+    importedEnvironmentIds.includes(homeEnvironmentId) &&
     Object.values(folderIdByThreadKey).every((folderId) => !liveFolderIds.has(folderId));
   return {
     operations,
