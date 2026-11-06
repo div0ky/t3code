@@ -63,7 +63,8 @@ export function planLegacySidebarFolderImport(
   for (const folder of legacy.folders) {
     const threadIds = threadIdsByFolderId.get(folder.id) ?? [];
     if (threadIds.length === 0 && !isHome) continue;
-    const folderId = isHome ? folder.id : `${folder.id}:${environmentId}`;
+    // Home can change between runs, so an id must never depend on it or two environments collide.
+    const folderId = `${folder.id}:${environmentId}`;
     operations.push({ action: "create", folderId, name: folder.name });
     if (threadIds.length > 0) operations.push({ action: "move_threads", threadIds, folderId });
     if (folder.collapsed) collapsedFolderIds.push(folderId);
