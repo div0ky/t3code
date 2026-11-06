@@ -45,7 +45,11 @@ import { threadHasQueuedTurnStart } from "./orchestration-v2/ThreadSettlementSer
 import { forkParked } from "./serverActivation.ts";
 import * as Settings from "./serverSettings.ts";
 import * as TerminalManager from "./terminal/Manager.ts";
-import { isFilesystemRoot, managedWorktreesDirectories } from "./worktreesDirectory.ts";
+import {
+  isFilesystemRoot,
+  isOtherInstallWorktree,
+  managedWorktreesDirectories,
+} from "./worktreesDirectory.ts";
 import * as GitVcsDriver from "./vcs/GitVcsDriver.ts";
 import { removeLinkedWorktree } from "./vcs/worktreeRemoval.ts";
 import { withWorkspaceLease } from "./workspace/workspaceLease.ts";
@@ -803,11 +807,12 @@ const make = Effect.gen(function* () {
     let waiting = false;
     const kept: string[] = [];
     const roots: Array<string> = [];
+    const home = yield* HostProcess.HomeDirectory;
     for (const directory of managedWorktreesDirectories(
       serverSettings,
       config.worktreesDir,
       path,
-      yield* HostProcess.HomeDirectory,
+      home,
     )) {
       const root = yield* fs.exists(directory).pipe(
         Effect.flatMap((exists) => (exists ? fs.realPath(directory) : Effect.succeed(null))),
@@ -910,6 +915,8 @@ const make = Effect.gen(function* () {
           return keep("worktree is a symbolic link");
         if (!roots.some((root) => inside(root, realPath)))
           return keep("outside the managed worktree folder");
+        if (isOtherInstallWorktree(realPath, worktreePath, config.worktreesDir, path, home))
+          return keep("belongs to the T3 Code install this thread was imported from");
         if (yield* containsProjectRoot(worktreePath, [project, ...snapshot.projects]))
           return keep("contains a project checkout");
         if ((yield* fs.stat(path.join(worktreePath, ".git"))).type !== "File")

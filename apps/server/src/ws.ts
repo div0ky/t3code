@@ -1,7 +1,10 @@
 import { OrchestrationDispatchCommandError } from "@t3tools/contracts";
+import { GitCommandError } from "@t3tools/contracts";
+import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Context from "effect/Context";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Orchestrator from "./orchestration-v2/Orchestrator.ts";
+import { isOtherInstallWorktree } from "./worktreesDirectory.ts";
 import * as PeerLinkRequests from "./peer/PeerLinkRequests.ts";
 import * as PeerLinks from "./peer/PeerLinks.ts";
 
@@ -3175,8 +3178,20 @@ export const layerWsRpc = (
         [WS_METHODS.vcsListRefs]: (input) => gitWorkflow.listRefs(input),
         [WS_METHODS.vcsCreateWorktree]: (input) =>
           gitWorkflow.createWorktree(input).pipe(Effect.tap(() => refreshGitStatus(input.cwd))),
-        [WS_METHODS.vcsRemoveWorktree]: (input) =>
-          gitWorkflow.removeWorktree(input).pipe(Effect.tap(() => refreshGitStatus(input.cwd))),
+        [WS_METHODS.vcsRemoveWorktree]: Effect.fn("ws.vcsRemoveWorktree")(function* (input) {
+          const home = yield* HostProcess.HomeDirectory;
+          const path = yield* Path.Path;
+          if (isOtherInstallWorktree(input.path, input.cwd, config.worktreesDir, path, home)) {
+            return yield* new GitCommandError({
+              operation: "ws.vcsRemoveWorktree",
+              command: "git worktree remove",
+              cwd: input.cwd,
+              detail: `Kept ${input.path}: it belongs to the T3 Code install this thread was imported from.`,
+            });
+          }
+          yield* gitWorkflow.removeWorktree(input);
+          yield* refreshGitStatus(input.cwd);
+        }),
         [WS_METHODS.vcsCreateRef]: (input) =>
           gitWorkflow.createRef(input).pipe(Effect.tap(() => refreshGitStatus(input.cwd))),
         [WS_METHODS.vcsSwitchRef]: (input) =>

@@ -79,7 +79,11 @@ import {
   installCliCommand,
   uninstallCliCommand,
 } from "./methods/cliCommand.ts";
-import { getSettingsImportState, runSettingsImport } from "./methods/settingsImport.ts";
+import {
+  getSettingsImportState,
+  runFullImport,
+  runSettingsImport,
+} from "./methods/settingsImport.ts";
 
 export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers")(function* () {
   const ipc = yield* DesktopIpc.DesktopIpc;
@@ -161,6 +165,7 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
   yield* ipc.handle(uninstallCliCommand);
   yield* ipc.handle(getSettingsImportState);
   yield* ipc.handle(runSettingsImport);
+  yield* ipc.handle(runFullImport);
   for (const previewMethod of PreviewIpc.methods) {
     // Explicit types preserve the error/service union of these heterogeneous preview methods.
     yield* ipc.handle<

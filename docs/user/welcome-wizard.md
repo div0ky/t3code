@@ -12,12 +12,23 @@ Close setup while no import is running to go straight to the app. You can connec
 computers and agents later from Settings, or open `/welcome` to run setup again.
 Direct links, such as Settings, open normally before setup is done.
 
-## Import settings into a separate build
+## Import into a separate build
 
 A build that keeps its own data, such as a personal `-fork` build, offers once at first launch to
-copy provider, appearance, and keybinding settings from T3 Code or T3 Code Nightly. To do this later,
-use **Settings → About → Import**, which restarts the app and keeps your current settings beside the
-new ones as `.before-import` files. Threads and saved credentials are not copied.
+copy from T3 Code or T3 Code Nightly. To do this later, use **Settings → About**.
+
+- **Import settings** copies provider, appearance, and keybinding settings, and keeps your current
+  ones beside them as `.before-import` files.
+- **Full import** also copies your projects, threads, history, and attachments. It replaces the
+  threads in this build and keeps what it replaced in `import-backups` in the build's data folder.
+
+A full import is a one-time copy, not a sync. Scheduled tasks arrive turned off, and threads that
+were running arrive stopped, so nothing runs by itself. Saved credentials and linked environments
+are not copied.
+
+Imported threads keep using the original worktrees and the same Claude and Codex sessions, so avoid
+continuing one thread in both apps. This build's storage cleanup and thread deletion leave worktrees
+in the default `~/.t3/worktrees` folder alone, but the original app can still remove them.
 
 ## Connect your computers
 

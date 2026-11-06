@@ -830,9 +830,11 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "settings-import",
-    title: "Import settings",
+    title: "Import from T3 Code",
     to: "/settings/about",
-    searchTerms: ["import copy migrate nightly settings providers keybindings"],
+    searchTerms: [
+      "import copy migrate nightly settings providers keybindings full threads projects history",
+    ],
     desktopOnly: true,
   },
   {

@@ -22,7 +22,7 @@ export const desktopSettingsImportStateAtom = Atom.make(
   Effect.tryPromise({
     try: (): Promise<DesktopSettingsImportState> =>
       getDesktopSettingsImportBridge()?.getState() ??
-      Promise.resolve({ available: false, sourcePath: "" }),
+      Promise.resolve({ available: false, fullImportAvailable: false, sourcePath: "" }),
     catch: (cause) => new DesktopSettingsImportLoadError({ cause }),
   }),
 ).pipe(Atom.withLabel("desktop:settings-import:load"));
