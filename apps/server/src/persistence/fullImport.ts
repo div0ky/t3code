@@ -63,6 +63,13 @@ const realPathOrSelf = (target: string) => {
   }
 };
 
+const newerMigrationRefusal = (recorded: ReadonlyArray<{ readonly id: number }>) => {
+  const newest = Math.max(0, ...recorded.map(({ id }) => id));
+  return newest > BUILD_MIGRATION_HEAD
+    ? `Your T3 Code database is on migration ${newest}, but this build only knows migrations through ${BUILD_MIGRATION_HEAD}. Merge upstream into your fork and rebuild, then import again. Nothing was changed.`
+    : undefined;
+};
+
 /** Everything the confirmation shows, and every reason to refuse before touching anything. */
 export const planFullImport = Effect.fn("fullImport.plan")(function* (input: {
   readonly sourceDir: string;
@@ -77,12 +84,8 @@ export const planFullImport = Effect.fn("fullImport.plan")(function* (input: {
   }
   const recorded = recordedMigrations(sourceDatabase);
   if (recorded === null) return yield* fail(`Could not read ${sourceDatabase}.`);
-  const newer = recorded.filter(({ id }) => id > BUILD_MIGRATION_HEAD);
-  if (newer.length > 0) {
-    return yield* fail(
-      `Your T3 Code database is on migration ${Math.max(...newer.map(({ id }) => id))}, but this build only knows migrations through ${BUILD_MIGRATION_HEAD}. Merge upstream into your fork and rebuild, then import again. Nothing was changed.`,
-    );
-  }
+  const refusal = newerMigrationRefusal(recorded);
+  if (refusal !== undefined) return yield* fail(refusal);
 
   return yield* Effect.try({
     try: (): FullImportPlan => {
@@ -171,7 +174,17 @@ export const neutralizeImportedDatabase = Effect.fn("fullImport.neutralize")(fun
         SET payload_json = json_remove(payload_json, '$.restartContinuationOfRunId')
         WHERE status = 'starting'
           AND json_extract(payload_json, '$.restartContinuationOfRunId') IS NOT NULL`;
-      // Open cohorts wake the parent thread when a subagent finishes during recovery.
+      // Open cohorts wake the parent thread when a subagent finishes during recovery. A run whose
+      // first delegate has not finished has no cohort yet, which recovery treats as open.
+      yield* sql`
+        UPDATE orchestration_v2_projection_runs
+        SET payload_json = json_set(
+          payload_json,
+          '$.delegatedCompletion',
+          json('{"disposition":"stopped","nextGeneration":1,"delivery":null}'))
+        WHERE json_type(payload_json, '$.delegatedCompletion') IS NULL
+          AND run_id IN (
+            SELECT run_id FROM orchestration_v2_projection_subagents WHERE origin = 'app_owned')`;
       yield* sql`
         UPDATE orchestration_v2_projection_runs
         SET payload_json = json_set(
@@ -278,6 +291,10 @@ export const runFullImport = Effect.fn("fullImport.run")(function* (input: {
         source.close();
       }
     });
+
+    // The source is live: it may have upgraded since the plan was checked.
+    const snapshotRefusal = newerMigrationRefusal(recordedMigrations(stagedDatabase) ?? []);
+    if (snapshotRefusal !== undefined) return yield* fail(snapshotRefusal);
 
     yield* input.onPhase("preparing");
     yield* Effect.gen(function* () {

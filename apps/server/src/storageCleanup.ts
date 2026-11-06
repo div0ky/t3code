@@ -915,7 +915,7 @@ const make = Effect.gen(function* () {
           return keep("worktree is a symbolic link");
         if (!roots.some((root) => inside(root, realPath)))
           return keep("outside the managed worktree folder");
-        if (isOtherInstallWorktree(realPath, config.worktreesDir, path, home))
+        if (isOtherInstallWorktree(realPath, worktreePath, config.worktreesDir, path, home))
           return keep("belongs to the T3 Code install this thread was imported from");
         if (yield* containsProjectRoot(worktreePath, [project, ...snapshot.projects]))
           return keep("contains a project checkout");

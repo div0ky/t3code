@@ -3181,7 +3181,7 @@ export const layerWsRpc = (
         [WS_METHODS.vcsRemoveWorktree]: Effect.fn("ws.vcsRemoveWorktree")(function* (input) {
           const home = yield* HostProcess.HomeDirectory;
           const path = yield* Path.Path;
-          if (isOtherInstallWorktree(input.path, config.worktreesDir, path, home)) {
+          if (isOtherInstallWorktree(input.path, input.cwd, config.worktreesDir, path, home)) {
             return yield* new GitCommandError({
               operation: "ws.vcsRemoveWorktree",
               command: "git worktree remove",

@@ -27,8 +27,8 @@ were running arrive stopped, so nothing runs by itself. Saved credentials and li
 are not copied.
 
 Imported threads keep using the original worktrees and the same Claude and Codex sessions, so avoid
-continuing one thread in both apps. This build's storage cleanup and thread deletion leave those
-worktrees alone, but the original app can still remove them.
+continuing one thread in both apps. This build's storage cleanup and thread deletion leave worktrees
+in the default `~/.t3/worktrees` folder alone, but the original app can still remove them.
 
 ## Connect your computers
 

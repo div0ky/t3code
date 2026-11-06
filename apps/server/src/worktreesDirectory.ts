@@ -30,13 +30,14 @@ export function isFilesystemRoot(directory: string, path: Path.Path): boolean {
 /** A full import points threads at the other install's worktrees, which that install still owns. */
 export function isOtherInstallWorktree(
   worktreePath: string,
+  cwd: string,
   worktreesDir: string,
   path: Path.Path,
   home: string,
 ): boolean {
   const shared = path.join(home, ".t3", "worktrees");
   if (path.resolve(worktreesDir) === shared) return false;
-  const relative = path.relative(shared, path.resolve(worktreePath));
+  const relative = path.relative(shared, path.resolve(cwd, worktreePath));
   return relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative);
 }
 

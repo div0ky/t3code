@@ -3,6 +3,7 @@ import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
 import * as NodeSqlite from "node:sqlite";
 
+import type { FullImportPhase } from "@t3tools/contracts";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
 import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
@@ -107,6 +108,17 @@ const setup = Effect.gen(function* () {
     },
   });
   run("r-prepared", 2, "starting", { restartContinuationOfRunId: "r-open" });
+  // A parent's cohort does not exist until its first delegate finishes.
+  run("r-delegating", 3, "running", {});
+  insert(source, "orchestration_v2_projection_subagents", {
+    subagent_id: "delegate",
+    thread_id: "t1",
+    run_id: "r-delegating",
+    origin: "app_owned",
+    status: "running",
+    updated_at: stale,
+    payload_json: JSON.stringify({ result: null }),
+  });
   insert(source, "orchestration_v2_projection_provider_sessions", {
     provider_session_id: "s1",
     provider: "codex",
@@ -169,13 +181,14 @@ const setup = Effect.gen(function* () {
     assert.isFalse(NodeFS.existsSync(path.join(targetDir, "full-import-staging")));
     assert.isFalse(NodeFS.existsSync(path.join(targetDir, "import-backups")));
   };
-  const run_ = runFullImport({
-    sourceDir,
-    targetDir,
-    backupName: "backup",
-    onPhase: () => Effect.void,
-  });
-  return { sourceDir, targetDir, targetStillOld, runImport: run_ };
+  const importWith = (onPhase: (phase: FullImportPhase) => void) =>
+    runFullImport({
+      sourceDir,
+      targetDir,
+      backupName: "backup",
+      onPhase: (phase) => Effect.sync(() => onPhase(phase)),
+    });
+  return { sourceDir, targetDir, targetStillOld, importWith, runImport: importWith(() => {}) };
 });
 
 describe("runFullImport", () => {
@@ -222,6 +235,11 @@ describe("runFullImport", () => {
         delivery: null,
       });
       assert.isUndefined(payload(runs, "run_id", "r-prepared").restartContinuationOfRunId);
+      assert.deepEqual(payload(runs, "run_id", "r-delegating").delegatedCompletion, {
+        disposition: "stopped",
+        nextGeneration: 1,
+        delivery: null,
+      });
 
       const thread = payload("orchestration_v2_projection_threads", "thread_id", "t1");
       assert.isUndefined(thread.limitRecovery);
@@ -294,6 +312,26 @@ describe("runFullImport", () => {
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   );
 
+  it.effect("refuses when the source upgrades after the first check", () =>
+    Effect.gen(function* () {
+      const { sourceDir, targetStillOld, importWith } = yield* setup;
+
+      const error = yield* Effect.flip(
+        importWith((phase) => {
+          if (phase !== "database") return;
+          const source = new NodeSqlite.DatabaseSync(NodePath.join(sourceDir, DB));
+          source.exec(
+            `INSERT INTO effect_sql_migrations (migration_id, name) VALUES (99999, 'Future')`,
+          );
+          source.close();
+        }),
+      );
+
+      assert.include(error.message, "migration 99999");
+      targetStillOld();
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+
   it.effect("keeps the current data when a step fails after the copy", () =>
     Effect.gen(function* () {
       const { sourceDir, targetStillOld, runImport } = yield* setup;
@@ -356,8 +394,9 @@ describe("isOtherInstallWorktree", () => {
     Effect.gen(function* () {
       const path = yield* Path.Path;
       const isOther = (worktree: string, own: string) =>
-        isOtherInstallWorktree(worktree, own, path, "/home/me");
+        isOtherInstallWorktree(worktree, "/home/me/.t3/worktrees/repo/b", own, path, "/home/me");
       assert.isTrue(isOther("/home/me/.t3/worktrees/repo/a", "/home/me/.t3-fork/worktrees"));
+      assert.isTrue(isOther("../a", "/home/me/.t3-fork/worktrees"));
       assert.isFalse(isOther("/home/me/.t3-fork/worktrees/repo/a", "/home/me/.t3-fork/worktrees"));
       assert.isFalse(isOther("/home/me/.t3/worktrees/repo/a", "/home/me/.t3/worktrees"));
       assert.isFalse(isOther("/elsewhere/repo", "/home/me/.t3-fork/worktrees"));
