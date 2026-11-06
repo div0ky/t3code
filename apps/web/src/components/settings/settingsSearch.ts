@@ -829,6 +829,13 @@ export const SETTINGS_SEARCH_ITEMS = [
     desktopOnly: true,
   },
   {
+    id: "settings-import",
+    title: "Import settings",
+    to: "/settings/about",
+    searchTerms: ["import copy migrate nightly settings providers keybindings"],
+    desktopOnly: true,
+  },
+  {
     id: "mobile-app",
     title: "Mobile app",
     to: "/settings/about",

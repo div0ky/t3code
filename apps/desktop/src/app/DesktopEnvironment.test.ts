@@ -78,7 +78,7 @@ describe("DesktopEnvironment", () => {
       const fork = yield* makeEnvironment({ appVersion: "0.1.7-fork.1" });
 
       assert.equal(fork.stateDir, "/Users/alice/.t3-fork/userdata");
-      assert.equal(fork.displayName, "T3 Code (Fork)");
+      assert.equal(fork.displayName, "T3 Code (div0ky)");
       assert.equal(fork.appUserModelId, "com.div0ky.t3code");
     }),
   );

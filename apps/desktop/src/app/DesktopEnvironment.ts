@@ -99,7 +99,7 @@ function resolveDesktopAppStageLabel(input: {
     return "Dev";
   }
 
-  if (isForkDesktopVersion(input.appVersion)) return "Fork";
+  if (isForkDesktopVersion(input.appVersion)) return "div0ky";
   return isNightlyDesktopVersion(input.appVersion) ? "Nightly" : "Beta";
 }
 

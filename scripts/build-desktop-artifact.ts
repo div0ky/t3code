@@ -2764,7 +2764,7 @@ export function resolvePackageManagerUserAgent(packageManager: string): string {
 }
 
 export function resolveDesktopProductName(version: string): string {
-  if (isForkDesktopVersion(version)) return "T3 Code (Fork)";
+  if (isForkDesktopVersion(version)) return "T3 Code (div0ky)";
   return resolveDesktopUpdateChannel(version) === "nightly"
     ? "T3 Code (Nightly)"
     : (desktopPackageJson.productName ?? "T3 Code");
@@ -2835,6 +2835,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   if (platform === "mac") {
     const path = yield* Path.Path;
     const repoRoot = yield* RepoRoot;
+    const forkMacIdentity = yield* Config.String("T3CODE_DESKTOP_MAC_IDENTITY").pipe(Config.option);
     buildConfig.mac = {
       target: target === "dmg" ? [target, "zip"] : [target],
       icon: "icon.icns",
@@ -2873,6 +2874,11 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
         },
       ],
       ...(signed ? { sign: path.join(repoRoot, "scripts/sign-macos.ts") } : {}),
+      // Local fork builds keep a stable identity for keychain access; they are not notarized, so
+      // the hardened runtime would only block their unsigned native modules.
+      ...(!signed && isForkDesktopVersion(version) && Option.isSome(forkMacIdentity)
+        ? { identity: forkMacIdentity.value, hardenedRuntime: false }
+        : {}),
       ...(macPasskeySigning
         ? {
             entitlements: macPasskeySigning.entitlementsPath,
@@ -3870,7 +3876,8 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
       ? path.join(stageAppDir, WINDOWS_SERVER_RESOURCE_SOURCE_DIR, WINDOWS_SERVER_ASAR_RESOURCE)
       : undefined;
   const stagePackageJson: StagePackageJson = {
-    name: "t3code",
+    // Electron names the keychain's Safe Storage item after this; sharing it prompts on every launch.
+    name: isForkDesktopVersion(appVersion) ? "t3code-div0ky" : "t3code",
     version: appVersion,
     buildVersion: appVersion,
     t3codeCommitHash: commitHash,

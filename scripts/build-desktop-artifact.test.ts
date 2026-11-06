@@ -540,7 +540,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
 
       assert.isNull(fork.publish);
       assert.equal(fork.appId, "com.div0ky.t3code");
-      assert.equal(fork.productName, "T3 Code (Fork)");
+      assert.equal(fork.productName, "T3 Code (div0ky)");
       assert.isNull(preview.publish);
       assert.isNull(previewChannel.publish);
       assert.deepStrictEqual(release.publish, [

@@ -53,6 +53,7 @@ import * as DesktopWslBackend from "../wsl/DesktopWslBackend.ts";
 import * as BrowserImport from "../preview/BrowserImport/BrowserImport.ts";
 import * as DesktopBackendConfiguration from "../backend/DesktopBackendConfiguration.ts";
 import * as DesktopCliCommand from "./DesktopCliCommand.ts";
+import * as DesktopSettingsImport from "./DesktopSettingsImport.ts";
 import * as DesktopClientSettings from "../settings/DesktopClientSettings.ts";
 import * as DesktopConnectionCatalogStore from "./DesktopConnectionCatalogStore.ts";
 import * as DesktopIpc from "../ipc/DesktopIpc.ts";
@@ -129,6 +130,11 @@ it.effect.each([false, true])(
           Effect.provideService(DesktopLifecycle.DesktopLifecycle, {
             register: Effect.void,
             relaunch: () => Effect.void,
+          }),
+          Effect.provideService(DesktopSettingsImport.DesktopSettingsImport, {
+            state: Effect.die("unused"),
+            confirmAndImport: Effect.die("unused"),
+            offerOnFirstLaunch: Effect.void,
           }),
           Effect.provideService(DesktopClerk.DesktopClerk, {
             configure: Effect.void,

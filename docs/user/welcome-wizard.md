@@ -12,6 +12,13 @@ Close setup while no import is running to go straight to the app. You can connec
 computers and agents later from Settings, or open `/welcome` to run setup again.
 Direct links, such as Settings, open normally before setup is done.
 
+## Import settings into a separate build
+
+A build that keeps its own data, such as a personal `-fork` build, offers once at first launch to
+copy provider, appearance, and keybinding settings from T3 Code or T3 Code Nightly. To do this later,
+use **Settings → About → Import**, which restarts the app and keeps your current settings beside the
+new ones as `.before-import` files. Threads and saved credentials are not copied.
+
 ## Connect your computers
 
 Select one or more computers to set up. If you opened T3 Code directly from a
