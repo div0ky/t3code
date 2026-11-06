@@ -189,6 +189,53 @@ describe("DesktopShellEnvironment", () => {
     }),
   );
 
+  it.effect("holds the backend for discovery only when no environment is cached", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const stateDir = yield* fs.makeTempDirectoryScoped();
+      const started = yield* Deferred.make<void>();
+      const release = yield* Deferred.make<void>();
+      const env = { SHELL: "/bin/zsh", PATH: "/usr/bin" };
+      const blockedSpawner = ChildProcessSpawner.make(() =>
+        Deferred.succeed(started, undefined).pipe(
+          Effect.andThen(Deferred.await(release)),
+          Effect.as(makeProcess(envOutput({ PATH: "/fresh/bin" }))),
+        ),
+      );
+      yield* runShellEnvironment({
+        env,
+        stateDir,
+        platform: "darwin",
+        handler: () => "",
+        processSpawner: blockedSpawner,
+        use: (service) =>
+          Effect.gen(function* () {
+            const waiting = yield* service.awaitEnvironment.pipe(Effect.forkChild);
+            yield* Deferred.await(started);
+            assert.isUndefined(waiting.pollUnsafe());
+            yield* Deferred.succeed(release, undefined);
+            yield* Fiber.join(waiting);
+            assert.equal(env.PATH, "/fresh/bin:/usr/bin");
+            return yield* service.awaitDiscovery;
+          }),
+      });
+
+      const never = yield* Deferred.make<void>();
+      const relaunchEnv = { SHELL: "/bin/zsh", PATH: "/usr/bin" };
+      yield* runShellEnvironment({
+        env: relaunchEnv,
+        stateDir,
+        platform: "darwin",
+        handler: () => "",
+        processSpawner: ChildProcessSpawner.make(() =>
+          Deferred.await(never).pipe(Effect.as(makeProcess(""))),
+        ),
+        use: (service) => service.awaitEnvironment.pipe(Effect.as(true)),
+      });
+      assert.equal(relaunchEnv.PATH, "/fresh/bin:/usr/bin");
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+
   it.effect(
     "reuses cached paths immediately and streams fresh discovery without keeping removed paths",
     () =>

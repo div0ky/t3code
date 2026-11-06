@@ -79,6 +79,11 @@ export class DesktopShellEnvironment extends Context.Service<
     // Desktop owns discovery, including on cache misses; the backend receives updates over fd4.
     readonly installIntoProcess: Effect.Effect<boolean>;
     readonly awaitDiscovery: Effect.Effect<boolean>;
+    /**
+     * Holds until process.env has a shell environment: at once from cache, or after discovery.
+     * Providers copy their environment when built, so the backend must not start without one.
+     */
+    readonly awaitEnvironment: Effect.Effect<void>;
     readonly updates: Stream.Stream<DesktopShellEnvironmentSnapshot>;
   }
 >()("@t3tools/desktop/shell/DesktopShellEnvironment") {}
@@ -673,6 +678,13 @@ export const make = Effect.gen(function* () {
   return DesktopShellEnvironment.of({
     installIntoProcess,
     awaitDiscovery: installIntoProcess.pipe(Effect.andThen(Deferred.await(discovered))),
+    awaitEnvironment: installIntoProcess.pipe(
+      Effect.andThen(Ref.get(latest)),
+      Effect.flatMap((snapshot) =>
+        Option.isSome(snapshot) ? Effect.void : Deferred.await(discovered).pipe(Effect.exit),
+      ),
+      Effect.asVoid,
+    ),
     updates,
   });
 });
