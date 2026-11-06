@@ -788,6 +788,7 @@ export const make = Effect.gen(function* () {
       Effect.provideService(DesktopEnvironment.DesktopEnvironment, environment),
     );
     const shellEnvironmentPrepared = yield* shellEnvironment.installIntoProcess;
+    yield* shellEnvironment.awaitEnvironment;
     return yield* resolvePrimaryStartConfig({
       ...shared,
       resourceMonitorPath,

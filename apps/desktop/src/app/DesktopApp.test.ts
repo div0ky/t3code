@@ -116,6 +116,7 @@ it.effect.each([false, true])(
             linuxPasswordStoreCommandLine: "basic",
           }),
           Effect.provideService(DesktopShellEnvironment.DesktopShellEnvironment, {
+            awaitEnvironment: Effect.void,
             installIntoProcess: Effect.succeed(true),
             awaitDiscovery: Effect.succeed(true),
             updates: Stream.empty,

@@ -89,6 +89,7 @@ describe("DesktopTelemetryPublisher", () => {
               layerPower,
               layerHistory,
               Layer.succeed(DesktopShellEnvironment.DesktopShellEnvironment, {
+                awaitEnvironment: Effect.void,
                 installIntoProcess: Effect.succeed(true),
                 awaitDiscovery: Effect.succeed(true),
                 updates: Stream.make({
