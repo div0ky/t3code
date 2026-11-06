@@ -143,6 +143,7 @@ const homeEnvironmentId = (configs: ServerConfigs) =>
 let importingLegacyFolders = false;
 // Config pushes retrigger the import, so a server that rejected it waits for the next launch.
 const rejectedImportEnvironmentIds = new Set<EnvironmentId>();
+const permissionWatchedEnvironmentIds = new Set<EnvironmentId>();
 
 async function importEnvironmentFolders(
   environmentId: EnvironmentId,
@@ -155,6 +156,16 @@ async function importEnvironmentFolders(
 }
 
 async function importLegacyFolders(configs: ServerConfigs) {
+  if (parseLegacySidebarFolders(readJson(LEGACY_STORAGE_KEY)) === null) return;
+  // A session, and so the permission, loads after the first config, and no push has to follow it.
+  for (const environmentId of configs.keys()) {
+    if (permissionWatchedEnvironmentIds.has(environmentId)) continue;
+    permissionWatchedEnvironmentIds.add(environmentId);
+    appAtomRegistry.subscribe(
+      serverEnvironment.updateSidebarFolders.permissionAtom(environmentId),
+      () => void importLegacyFolders(appAtomRegistry.get(environmentServerConfigsAtom)),
+    );
+  }
   const home = homeEnvironmentId(configs);
   if (importingLegacyFolders || home === null) return;
   importingLegacyFolders = true;

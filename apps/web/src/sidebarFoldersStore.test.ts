@@ -13,6 +13,7 @@ const state = vi.hoisted(() => ({
   sent: [] as Array<{ environmentId: string; input: { action: string } }>,
   toasts: [] as Array<{ title: string }>,
   notify: (_configs: unknown) => {},
+  permissionListeners: new Map<string, () => void>(),
 }));
 
 vi.mock("@t3tools/client-runtime/state/runtime", () => ({
@@ -28,8 +29,9 @@ vi.mock("@t3tools/client-runtime/state/runtime", () => ({
 vi.mock("./rpc/atomRegistry", () => ({
   appAtomRegistry: {
     get: (atom: unknown) => (typeof atom === "string" ? state.allowed.has(atom) : state.configs),
-    subscribe: (_atom: unknown, listener: (configs: unknown) => void) => {
-      state.notify = listener;
+    subscribe: (atom: unknown, listener: (configs: unknown) => void) => {
+      if (typeof atom === "string") state.permissionListeners.set(atom, () => listener(true));
+      else state.notify = listener;
     },
   },
 }));
@@ -48,6 +50,7 @@ async function setup(legacy?: unknown) {
   state.rejected.clear();
   state.sent.length = 0;
   state.toasts.length = 0;
+  state.permissionListeners.clear();
   const storage = new Map<string, string>();
   if (legacy !== undefined) storage.set(LEGACY_KEY, JSON.stringify(legacy));
   vi.stubGlobal("window", {
@@ -81,6 +84,18 @@ describe("useSidebarFoldersStore", () => {
 
     expect(store.getState().createFolder(null)).not.toBeNull();
     expect(state.sent.at(-1)).toMatchObject({ environmentId: first, input: { action: "create" } });
+  });
+
+  it("imports once a session grants permission after the config, with no further push", async () => {
+    const { store, storage } = await setup(legacyFolder([first]));
+    state.configs.set(first, { settings: { sidebarFolders: [] } });
+    state.notify(state.configs);
+    expect(state.sent).toEqual([]);
+
+    state.allowed.add(first);
+    state.permissionListeners.get(first)?.();
+    await vi.waitFor(() => expect(storage.has(LEGACY_KEY)).toBe(false));
+    expect(store.getState().folders.map((folder) => folder.name)).toEqual(["Work"]);
   });
 
   it("lets later environments import when one rejects it, and does not retry it", async () => {
