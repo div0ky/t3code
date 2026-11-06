@@ -1,4 +1,5 @@
 import type { DesktopSettingsImportResult, DesktopSettingsImportState } from "@t3tools/contracts";
+import { fromLenientJson } from "@t3tools/shared/schemaJson";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -12,7 +13,8 @@ import { isForkDesktopVersion } from "./DesktopStatePaths.ts";
 // Secrets and environment identity stay behind: they belong to the install that created them.
 const SETTINGS_FILES = ["settings.json", "client-settings.json", "keybindings.json"] as const;
 const OFFERED_MARKER = "settings-import-offered";
-const decodeJson = Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown));
+// The same lenient parser the settings readers use: these files may hold comments.
+const decodeJson = Schema.decodeEffect(fromLenientJson(Schema.Unknown));
 
 export class DesktopSettingsImportError extends Schema.TaggedError<DesktopSettingsImportError>()(
   "DesktopSettingsImportError",

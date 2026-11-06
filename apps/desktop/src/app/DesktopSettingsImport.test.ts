@@ -20,14 +20,15 @@ describe("copySettingsFiles", () => {
   it.effect("copies settings only and keeps what it replaced", () =>
     Effect.gen(function* () {
       const { fs, sourceDir, targetDir, source, target, join } = yield* setup;
-      yield* fs.writeFileString(source("settings.json"), '{"from":"nightly"}');
+      const commented = '{ // from nightly\n  "from": "nightly",\n}';
+      yield* fs.writeFileString(source("settings.json"), commented);
       yield* fs.writeFileString(source("environment-id"), "nightly-id");
       yield* fs.makeDirectory(source("secrets"));
       yield* fs.writeFileString(target("settings.json"), '{"from":"fork"}');
 
       yield* copySettingsFiles({ sourceDir, targetDir, join });
 
-      assert.equal(yield* fs.readFileString(target("settings.json")), '{"from":"nightly"}');
+      assert.equal(yield* fs.readFileString(target("settings.json")), commented);
       assert.equal(
         yield* fs.readFileString(target("settings.json.before-import")),
         '{"from":"fork"}',
