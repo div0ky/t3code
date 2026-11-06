@@ -359,6 +359,7 @@ import {
   ServerSettings,
   ServerSettingsError,
   ServerSettingsPatch,
+  SidebarFolderOperation,
 } from "./settings.ts";
 import {
   ScheduledTaskDeleteInput,
@@ -514,6 +515,7 @@ export const WS_METHODS = {
   peerLinksUnlink: "peerLinks.unlink",
   peerLinksAnswerRequest: "peerLinks.answerRequest",
   serverUpdateSettings: "server.updateSettings",
+  serverUpdateSidebarFolders: "server.updateSidebarFolders",
   serverDiscoverSourceControl: "server.discoverSourceControl",
   serverSearchAcpRegistry: "server.searchAcpRegistry",
   serverPrepareAcpRegistryAgent: "server.prepareAcpRegistryAgent",
@@ -829,6 +831,11 @@ const WsServerUpdateSettingsRpc = Rpc.make(WS_METHODS.serverUpdateSettings, {
     providerInstanceMutation: Schema.optionalKey(ProviderInstanceMutation),
   }),
   success: ServerSettings,
+  error: Schema.Union([ServerSettingsError, EnvironmentAuthorizationError]),
+});
+
+const WsServerUpdateSidebarFoldersRpc = Rpc.make(WS_METHODS.serverUpdateSidebarFolders, {
+  payload: SidebarFolderOperation,
   error: Schema.Union([ServerSettingsError, EnvironmentAuthorizationError]),
 });
 
@@ -2029,6 +2036,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsServerGetStorageCleanupReportRpc,
   WsServerGetDatabaseStorageRpc,
   WsServerUpdateSettingsRpc,
+  WsServerUpdateSidebarFoldersRpc,
   WsPeerLinksListRpc,
   WsPeerLinksLinkRpc,
   WsPeerLinksUnlinkRpc,

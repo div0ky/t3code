@@ -1279,7 +1279,9 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   });
   const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
   const startNewFolder = useStableCallback(() =>
-    setRenamingFolderId(useSidebarFoldersStore.getState().createFolder()),
+    setRenamingFolderId(
+      useSidebarFoldersStore.getState().createFolder(routeThreadRef?.environmentId ?? null),
+    ),
   );
   const toggleCustomFolder = useStableCallback((folderId: string) =>
     useSidebarFoldersStore.getState().toggleFolder(folderId),
@@ -2718,8 +2720,14 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 projectRef.projectId === thread.projectId,
             ),
           ) ?? null;
-        const { folders: folderChoices, folderIdByThreadKey: threadFolders } =
-          useSidebarFoldersStore.getState();
+        const {
+          folders: allFolders,
+          folderIdByThreadKey: threadFolders,
+          environmentIdByFolderId,
+        } = useSidebarFoldersStore.getState();
+        const folderChoices = allFolders.filter(
+          (folder) => environmentIdByFolderId[folder.id] === threadRef.environmentId,
+        );
         const currentFolderId = threadFolders[threadKey];
         const clicked = await settlePromise(() =>
           api.contextMenu.show(

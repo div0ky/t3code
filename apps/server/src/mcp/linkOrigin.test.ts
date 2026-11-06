@@ -377,6 +377,12 @@ it.layer(Layer.provideMerge(layerTools, layerOrchestration))("work a link starts
         "capability_denied",
       );
 
+      // Nor folders, for the same reason.
+      assert.equal(
+        failureCode(yield* call(laptop, "t3_folder_organize", { action: "create", name: "Work" })),
+        "capability_denied",
+      );
+
       // Reads are not fenced.
       const read = yield* call(laptop, "t3_thread_read", { threadId: users });
       assert.equal(read.isError, false);
