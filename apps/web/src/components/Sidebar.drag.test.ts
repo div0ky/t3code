@@ -7,7 +7,10 @@ import {
   restrictBelowSidebarLabel,
 } from "./Sidebar.drag";
 import {
+  groupThreadsBySidebarFolder,
+  resolveFolderDropOrder,
   resolveSidebarDropTarget,
+  sidebarFolderMarker,
   sidebarListItemId,
   sidebarMarkerId,
   type SidebarListItem,
@@ -724,5 +727,86 @@ describe("lifted card clearance", () => {
   it("follows the list when it scrolls and includes content preceding Pins", () => {
     expect(511 + apply(511, 36, -500, 96).y).toBe(128);
     expect(511 + apply(511, 36, -500, 136, 114).y).toBe(250);
+  });
+});
+
+describe("sidebar folders", () => {
+  const items = [
+    pinnedHeader,
+    divider,
+    marker("active-placeholder"),
+    thread("loose", "active"),
+    marker(sidebarFolderMarker("work")),
+    thread("work-1", "active"),
+    thread("work-2", "active"),
+    marker(sidebarFolderMarker("closed")),
+    settledHeader,
+    marker("settled-placeholder"),
+    thread("done", "settled"),
+  ];
+  const serverOrder = ["work-2", "loose", "work-1"];
+  const dropOn = (activeKey: string, over: string) => {
+    const target = resolveSidebarDropTarget(items, activeKey, over)!;
+    return resolveFolderDropOrder(target, serverOrder, activeKey);
+  };
+
+  it("files a thread dropped on a folder header, from above or below", () => {
+    expect(dropOn("loose", sidebarMarkerId(sidebarFolderMarker("work"))).folderId).toBe("work");
+    const fromBelow = dropOn("done", sidebarMarkerId(sidebarFolderMarker("closed")));
+    expect(fromBelow).toMatchObject({ section: "active", folderId: "closed" });
+    const upIntoFolder = dropOn("work-2", sidebarMarkerId(sidebarFolderMarker("work")));
+    expect(upIntoFolder.folderSiblings).toEqual(["work-2", "work-1"]);
+  });
+
+  it("takes a thread out of a folder when dropped on the unfiled list", () => {
+    expect(dropOn("work-1", "loose")).toMatchObject({ section: "active", folderId: null });
+    expect(dropOn("work-1", sidebarMarkerId("active-placeholder")).folderId).toBeNull();
+  });
+
+  it("keeps the server order and moves only the thread next to its new neighbour", () => {
+    expect(dropOn("work-2", "work-1").activeOrder).toEqual(["loose", "work-2", "work-1"]);
+    // Nothing to sit beside: an empty folder leaves the server order alone.
+    expect(dropOn("loose", sidebarMarkerId(sidebarFolderMarker("closed"))).activeOrder).toEqual(
+      serverOrder,
+    );
+  });
+
+  it("projects the drop into the folder without hiding its header", () => {
+    const strategy = createSidebarSortingStrategy({
+      items,
+      settledOrder: ["done"],
+      settledExpanded: true,
+      cardHeight: 50,
+      slimHeight: 36,
+    });
+    const rects = items.map((_, index) => ({
+      top: index * 50,
+      left: 0,
+      width: 100,
+      height: 50,
+      bottom: index * 50 + 50,
+      right: 100,
+    }));
+    const transformOf = (id: string) => {
+      const index = items.findIndex((item) => sidebarListItemId(item) === id);
+      return strategy({ rects, activeIndex: 3, overIndex: 7, index, activeNodeRect: rects[3]! })!;
+    };
+    expect(transformOf(sidebarMarkerId(sidebarFolderMarker("work"))).scaleY).toBe(1);
+    expect(transformOf(sidebarMarkerId(sidebarFolderMarker("closed"))).scaleY).toBe(1);
+  });
+
+  it("groups threads and leaves ones in a deleted folder unfiled", () => {
+    const grouped = groupThreadsBySidebarFolder({
+      threads: ["a", "b", "c"],
+      folders: [
+        { id: "work", name: "Work", collapsed: false },
+        { id: "empty", name: "Empty", collapsed: false },
+      ],
+      folderIdByThreadKey: { a: "work", c: "gone" },
+      keyOf: (key) => key,
+      keepEmpty: false,
+    });
+    expect(grouped.unfiled).toEqual(["b", "c"]);
+    expect(grouped.folders.map(({ folder }) => folder.id)).toEqual(["work"]);
   });
 });

@@ -131,6 +131,19 @@ rename a thread, regenerate its title, or link and unlink a pull request. These 
 appear on web, desktop, and mobile without requiring the originating browser to remain
 open.
 
+### Organize threads into folders
+
+On web and desktop, use **New folder** next to the search box, then name it. Drag a thread onto a
+folder's header, or between the threads inside it, to file it there. Drag it back up to the list
+above the folders to take it out, or use **Move to folder** in the thread's menu. Click a header to
+collapse the folder. A collapsed folder still shows the thread you have open, and a dot when a
+hidden thread needs you. Right-click a header to rename or delete it. Deleting a folder keeps its
+threads.
+
+Folders hold active threads. Pinning, snoozing, or settling a thread moves it to that section as
+usual, and it returns to its folder when it becomes active again. Folders are saved on this device
+and client only, and are hidden while **Boring sidebar** is on.
+
 ### Fold working threads (beta)
 
 Threads that are working or waiting on work they will resume from move into a collapsed

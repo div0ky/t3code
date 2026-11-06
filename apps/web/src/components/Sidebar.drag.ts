@@ -2,6 +2,7 @@ import { closestCenter, type CollisionDetection, type Modifier } from "@dnd-kit/
 import { verticalListSortingStrategy, type SortingStrategy } from "@dnd-kit/sortable";
 import {
   resolveSidebarDropTarget,
+  sidebarFolderIdOfMarker,
   sidebarListItemId,
   sidebarMarkerId,
   type SidebarListItem,
@@ -28,6 +29,87 @@ export function restrictBelowSidebarLabel(
   return transform.y < minimumY ? { ...transform, y: minimumY } : transform;
 }
 
+// Filing can shift a header out from under a still pointer; hold it until the pointer really leaves.
+const FOLDER_HIT_RELEASE_PX = 34;
+
+// Module state: the detector is rebuilt each render, and a ref read there de-optimizes Sidebar.
+let folderHit: { readonly id: string; readonly y: number } | null = null;
+
+export function resetSidebarFolderHit() {
+  folderHit = null;
+}
+
+/**
+ * closestCenter measures rows before the drag, but opening the destination shifts them by more than a
+ * folder header is tall. So folder headers are only hit where they are drawn, and with nothing unfiled
+ * to aim at, the space above the first folder is the way back to the unfiled list.
+ */
+function resolveFolderDropZone(
+  args: Parameters<CollisionDetection>[0],
+  items: readonly SidebarListItem[],
+) {
+  const pointer = args.pointerCoordinates;
+  if (!pointer) return undefined;
+  const folderIds = new Set(
+    items.flatMap((item) =>
+      item.kind === "marker" && sidebarFolderIdOfMarker(item.marker) !== null
+        ? [sidebarMarkerId(item.marker)]
+        : [],
+    ),
+  );
+  if (folderIds.size === 0) return undefined;
+  const collision = (id: string) => {
+    const container = args.droppableContainers.find((candidate) => candidate.id === id);
+    return container && { id: container.id, data: { droppableContainer: container, value: 0 } };
+  };
+  const headers = args.droppableContainers
+    .filter((container) => folderIds.has(String(container.id)))
+    .map((container) => ({
+      id: String(container.id),
+      rect: container.node.current?.getBoundingClientRect(),
+    }));
+  const drawn = headers.find(
+    ({ rect }) => rect && pointer.y >= rect.top && pointer.y <= rect.bottom,
+  );
+  if (drawn) {
+    folderHit = { id: drawn.id, y: pointer.y };
+    return collision(drawn.id);
+  }
+  // Filing only ever slides a header up, so a pointer above the header has really left it.
+  const heldId = folderHit?.id;
+  const heldRect = headers.find(({ id }) => id === heldId)?.rect;
+  if (
+    folderHit &&
+    heldRect &&
+    pointer.y > heldRect.bottom &&
+    Math.abs(pointer.y - folderHit.y) < FOLDER_HIT_RELEASE_PX
+  ) {
+    return collision(folderHit.id);
+  }
+  folderHit = null;
+  const firstFolderTop = Math.min(...headers.map(({ rect }) => rect?.top ?? Infinity));
+  const divider = args.droppableContainers
+    .find((container) => container.id === sidebarMarkerId("pinned-divider"))
+    ?.node.current?.querySelector(".sidebar-drag-boundary-label")
+    ?.getBoundingClientRect();
+  const dividerIndex = items.findIndex(
+    (item) => item.kind === "marker" && item.marker === "pinned-divider",
+  );
+  const firstFolderIndex = items.findIndex(
+    (item) => item.kind === "marker" && folderIds.has(sidebarMarkerId(item.marker)),
+  );
+  const hasUnfiledRow = items
+    .slice(dividerIndex, firstFolderIndex)
+    .some((item) => item.kind === "thread" && item.key !== args.active.id);
+  if (!hasUnfiledRow && divider && pointer.y > divider.bottom && pointer.y < firstFolderTop) {
+    return collision(sidebarMarkerId("active-placeholder"));
+  }
+  return undefined;
+}
+
+const isFolderCollision = (id: unknown) =>
+  typeof id === "string" && id.startsWith(sidebarMarkerId("folder:"));
+
 export function createSidebarCollisionDetection(
   isValidTarget: (id: string) => boolean,
   options: {
@@ -40,9 +122,11 @@ export function createSidebarCollisionDetection(
   let previousPointerY = options.activationY;
   let boundarySection: "pinned" | "active" | undefined;
   return (args) => {
-    let collisions = closestCenter(args);
-    const pointer = args.pointerCoordinates;
     const items = options.items;
+    const folderZone = items && resolveFolderDropZone(args, items);
+    if (folderZone) return [folderZone];
+    let collisions = closestCenter(args).filter((collision) => !isFolderCollision(collision.id));
+    const pointer = args.pointerCoordinates;
     const source = items?.find((item) => item.kind === "thread" && item.key === args.active.id);
     const boundary = args.droppableContainers
       .find((container) => container.id === sidebarMarkerId("pinned-divider"))
@@ -175,7 +259,19 @@ export function createSidebarSortingStrategy(input: {
     marker("pinned-header");
     projected.push(...groups.pinned);
     marker("pinned-divider");
-    section("active");
+    if (target.activeSlots.length > 0) {
+      const unfiled = target.activeSlots.findIndex(
+        (item) => item.kind === "thread" || sidebarFolderIdOfMarker(item.marker) !== null,
+      );
+      // The placeholder is the drop zone back to the unfiled list; it only needs room when empty.
+      const hasUnfiledRow = target.activeSlots[unfiled]?.kind === "thread";
+      for (const item of target.activeSlots) {
+        if (item.kind === "thread") projected.push({ ...item, section: "active" });
+        else if (item.marker !== "active-placeholder" || !hasUnfiledRow) projected.push(item);
+      }
+    } else {
+      section("active");
+    }
     if (items.some((item) => item.kind === "marker" && item.marker === "working-header")) {
       marker("working-header");
       projected.push(...groups.working);
