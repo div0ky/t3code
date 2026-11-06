@@ -13,9 +13,9 @@ const defaultInput = {
   platform: "darwin",
   processArch: "arm64",
   appVersion: "0.0.22",
-  appPath: "/Applications/T3 Code.app/Contents/Resources/app.asar",
+  appPath: "/Applications/D5 Code.app/Contents/Resources/app.asar",
   isPackaged: false,
-  resourcesPath: "/Applications/T3 Code.app/Contents/Resources",
+  resourcesPath: "/Applications/D5 Code.app/Contents/Resources",
   runningUnderArm64Translation: false,
 } satisfies DesktopEnvironment.MakeDesktopEnvironmentInput;
 
@@ -78,7 +78,7 @@ describe("DesktopEnvironment", () => {
       const fork = yield* makeEnvironment({ appVersion: "0.1.7-fork.1" });
 
       assert.equal(fork.stateDir, "/Users/alice/.t3-fork/userdata");
-      assert.equal(fork.displayName, "T3 Code (div0ky)");
+      assert.equal(fork.displayName, "D5 Code");
       assert.equal(fork.appUserModelId, "com.div0ky.t3code");
     }),
   );

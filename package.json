@@ -49,7 +49,7 @@
     "dist:desktop:artifact": "node scripts/build-desktop-artifact.ts",
     "dist:desktop:dmg": "node scripts/build-desktop-artifact.ts --platform mac --target dmg",
     "dist:desktop:dmg:arm64": "node scripts/build-desktop-artifact.ts --platform mac --target dmg --arch arm64",
-    "dist:desktop:div0ky": "T3CODE_DESKTOP_MAC_IDENTITY='Apple Development' node scripts/build-desktop-artifact.ts --platform mac --target dmg --arch arm64 --build-version 0.1.7-fork.1",
+    "dist:desktop:d5": "T3CODE_DESKTOP_MAC_IDENTITY='Apple Development' node scripts/build-desktop-artifact.ts --platform mac --target dmg --arch arm64 --build-version 0.1.7-fork.1",
     "dist:desktop:dmg:x64": "node scripts/build-desktop-artifact.ts --platform mac --target dmg --arch x64",
     "dist:desktop:linux": "node scripts/build-desktop-artifact.ts --platform linux --target AppImage --arch x64",
     "dist:gnome-extension": "gnome-extensions pack apps/desktop/gnome-extension --extra-source=captureService.js --extra-source=captureFeedback.js --extra-source=feedbackGeometry.js --out-dir=release --force",
