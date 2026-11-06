@@ -343,8 +343,6 @@ export function groupThreadsBySidebarFolder<T>(input: {
   readonly folders: readonly SidebarFolder[];
   readonly folderIdByThreadKey: Readonly<Record<string, string>>;
   readonly keyOf: (thread: T) => string;
-  /** A project filter hides folders with nothing in scope. */
-  readonly keepEmpty: boolean;
 }) {
   const threadsByFolderId = new Map<string, T[]>(input.folders.map((folder) => [folder.id, []]));
   const unfiled: T[] = [];
@@ -354,10 +352,10 @@ export function groupThreadsBySidebarFolder<T>(input: {
   }
   return {
     unfiled,
-    folders: input.folders.flatMap((folder) => {
-      const threads = threadsByFolderId.get(folder.id) ?? [];
-      return input.keepEmpty || threads.length > 0 ? [{ folder, threads }] : [];
-    }),
+    folders: input.folders.map((folder) => ({
+      folder,
+      threads: threadsByFolderId.get(folder.id) ?? [],
+    })),
   };
 }
 

@@ -528,6 +528,19 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
         undefined,
       );
 
+      const fork = yield* createBuildConfig(
+        "mac",
+        "dmg",
+        "0.1.7-fork.1",
+        false,
+        false,
+        undefined,
+        undefined,
+      );
+
+      assert.isNull(fork.publish);
+      assert.equal(fork.appId, "com.div0ky.t3code");
+      assert.equal(fork.productName, "T3 Code (Fork)");
       assert.isNull(preview.publish);
       assert.isNull(previewChannel.publish);
       assert.deepStrictEqual(release.publish, [

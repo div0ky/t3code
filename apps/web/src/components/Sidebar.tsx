@@ -556,7 +556,6 @@ function useSidebarThreads(input: {
     folders: folderGroups === null ? sidebarFolders : [],
     folderIdByThreadKey,
     keyOf: threadShellKey,
-    keepEmpty: scopedProjectKeys === null,
   });
   const customFolders = groupedFolders.map(({ folder, threads: folderThreads }) => ({
     folder,
@@ -2759,7 +2758,11 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 },
                 snoozePresets,
               }),
-              ...(folderChoices.length > 0 && !boringSidebarEnabled
+              ...(folderChoices.length > 0 &&
+              !boringSidebarEnabled &&
+              !isPinned &&
+              !isSettled &&
+              !isSnoozed
                 ? [
                     {
                       id: "move-to-folder" as const,

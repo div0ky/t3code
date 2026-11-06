@@ -804,9 +804,8 @@ describe("sidebar folders", () => {
       ],
       folderIdByThreadKey: { a: "work", c: "gone" },
       keyOf: (key) => key,
-      keepEmpty: false,
     });
     expect(grouped.unfiled).toEqual(["b", "c"]);
-    expect(grouped.folders.map(({ folder }) => folder.id)).toEqual(["work"]);
+    expect(grouped.folders.map(({ folder }) => folder.id)).toEqual(["work", "empty"]);
   });
 });
