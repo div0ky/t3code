@@ -4,8 +4,6 @@ import * as Path from "effect/Path";
 import * as PlatformError from "effect/PlatformError";
 import * as Schema from "effect/Schema";
 
-import { isForkDesktopVersion } from "./DesktopStatePaths.ts";
-
 export class DesktopUserDataInitializationError extends Schema.TaggedError<DesktopUserDataInitializationError>()(
   "DesktopUserDataInitializationError",
   {
@@ -38,11 +36,11 @@ export const resolveUserDataPath = Effect.fn("desktop.userData.resolveUserDataPa
     readonly appDataDirectory: string;
     readonly isDevelopment: boolean;
     readonly platform: NodeJS.Platform;
-    readonly appVersion?: string;
+    readonly isPackaged?: boolean;
   }) {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
-    if (input.appVersion !== undefined && isForkDesktopVersion(input.appVersion)) {
+    if (input.isPackaged && !input.isDevelopment) {
       return path.join(input.appDataDirectory, "t3code-fork");
     }
     const names = input.isDevelopment

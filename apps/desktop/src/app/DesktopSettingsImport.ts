@@ -24,7 +24,6 @@ import * as Electron from "electron";
 import * as ElectronDialog from "../electron/ElectronDialog.ts";
 import * as ElectronWindow from "../electron/ElectronWindow.ts";
 import * as DesktopEnvironment from "./DesktopEnvironment.ts";
-import { isForkDesktopVersion } from "./DesktopStatePaths.ts";
 
 // Secrets and environment identity stay behind: they belong to the install that created them.
 const SETTINGS_FILES = ["settings.json", "client-settings.json", "keybindings.json"] as const;
@@ -138,8 +137,7 @@ export const make = Effect.gen(function* () {
   const stagedDatabasePath = path.join(environment.stateDir, ...STAGED_DATABASE);
 
   const exists = (target: string) => fs.exists(target).pipe(Effect.orElseSucceed(() => false));
-  const canImport =
-    isForkDesktopVersion(environment.appVersion) && sourceDir !== environment.stateDir;
+  const canImport = environment.isPackaged && sourceDir !== environment.stateDir;
 
   const available = Effect.gen(function* () {
     if (!canImport) return false;
