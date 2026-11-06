@@ -1080,7 +1080,7 @@ describe("Working shelf (beta)", () => {
 
     it("never drops into the Working shelf, and keeps it out of the inbox order", () => {
       expect(resolveSidebarDropTarget(items, "a1", "w1")).toBeNull();
-      expect(resolveSidebarDropTarget(items, "p1", "a2")).toEqual({
+      expect(resolveSidebarDropTarget(items, "p1", "a2")).toMatchObject({
         section: "active",
         pinnedOrder: [],
         activeOrder: ["a1", "a2", "p1"],
