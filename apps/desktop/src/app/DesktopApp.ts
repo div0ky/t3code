@@ -347,7 +347,7 @@ const startup = Effect.gen(function* () {
   yield* DesktopStartupRecovery.listen;
   // Portal identity is prepared pre-ready; MIME helpers must not gate the backend or window.
   yield* linuxUrlHandler.register.pipe(Effect.forkScoped);
-  yield* (yield* DesktopSettingsImport.DesktopSettingsImport).offerOnFirstLaunch;
+  yield* (yield* DesktopSettingsImport.DesktopSettingsImport).beforeBackendStart;
   yield* bootstrap.pipe(Effect.catchCause((cause) => fatalStartupCause("bootstrap", cause)));
 }).pipe(Effect.withSpan("desktop.startup"));
 

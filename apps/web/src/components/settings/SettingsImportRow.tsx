@@ -15,16 +15,15 @@ export function SettingsImportRow() {
   const query = useEnvironmentQuery(bridge ? desktopSettingsImportStateAtom : null);
   const [pending, setPending] = useState(false);
 
-  if (!bridge || !query.data?.available) return null;
-  const run = () => {
+  if (!bridge || !(query.data?.available || query.data?.fullImportAvailable)) return null;
+  const run = (start: () => Promise<unknown>) => {
     setPending(true);
-    void bridge
-      .run()
+    void start()
       .catch((error: unknown) => {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Could not import settings",
+            title: "Could not import",
             description: error instanceof Error ? error.message : "Something went wrong.",
           }),
         );
@@ -35,11 +34,25 @@ export function SettingsImportRow() {
   return (
     <SettingsRow
       {...searchableSetting("settings-import")}
-      description={`Copy provider, appearance, and keybinding settings from T3 Code or T3 Code Nightly (${query.data.sourcePath}). Threads and saved credentials are not copied.`}
+      description="Copy from T3 Code or Nightly. Import settings brings settings and keybindings. Full import also brings projects, threads, history, and attachments, replacing the threads here."
       control={
-        <Button size="sm" variant="outline" disabled={pending} onClick={run}>
-          Import
-        </Button>
+        <div className="flex gap-2">
+          {query.data.available ? (
+            <Button size="sm" variant="outline" disabled={pending} onClick={() => run(bridge.run)}>
+              Import settings
+            </Button>
+          ) : null}
+          {query.data.fullImportAvailable ? (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={pending}
+              onClick={() => run(bridge.runFull)}
+            >
+              Full import
+            </Button>
+          ) : null}
+        </div>
       }
     />
   );

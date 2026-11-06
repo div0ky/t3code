@@ -282,6 +282,7 @@ contextBridge.exposeInMainWorld("desktopBridge", {
   settingsImport: {
     getState: () => ipcRenderer.invoke(IpcChannels.SETTINGS_IMPORT_GET_STATE_CHANNEL),
     run: () => ipcRenderer.invoke(IpcChannels.SETTINGS_IMPORT_RUN_CHANNEL),
+    runFull: () => ipcRenderer.invoke(IpcChannels.SETTINGS_IMPORT_RUN_FULL_CHANNEL),
   },
   onUpdateState: (listener) => {
     const wrappedListener = (_event: Electron.IpcRendererEvent, state: unknown) => {

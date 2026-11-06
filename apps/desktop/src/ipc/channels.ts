@@ -33,6 +33,7 @@ export const CLI_COMMAND_INSTALL_CHANNEL = "desktop:cli-command-install";
 export const CLI_COMMAND_UNINSTALL_CHANNEL = "desktop:cli-command-uninstall";
 export const SETTINGS_IMPORT_GET_STATE_CHANNEL = "desktop:settings-import-get-state";
 export const SETTINGS_IMPORT_RUN_CHANNEL = "desktop:settings-import-run";
+export const SETTINGS_IMPORT_RUN_FULL_CHANNEL = "desktop:settings-import-run-full";
 export const GET_APP_BRANDING_CHANNEL = "desktop:get-app-branding";
 export const GET_RELAY_TELEMETRY_ENABLED_CHANNEL = "desktop:get-relay-telemetry-enabled";
 export const GET_SYSTEM_LOCALE_CHANNEL = "desktop:get-system-locale";

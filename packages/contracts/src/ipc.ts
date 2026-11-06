@@ -347,12 +347,41 @@ export type DesktopCliCommandState = typeof DesktopCliCommandStateSchema.Type;
 
 export const DesktopSettingsImportStateSchema = Schema.Struct({
   available: Schema.Boolean,
+  fullImportAvailable: Schema.Boolean,
   sourcePath: Schema.String,
 });
 export type DesktopSettingsImportState = typeof DesktopSettingsImportStateSchema.Type;
 
 export const DesktopSettingsImportResultSchema = Schema.Struct({ imported: Schema.Boolean });
 export type DesktopSettingsImportResult = typeof DesktopSettingsImportResultSchema.Type;
+
+export const FullImportPlanSchema = Schema.Struct({
+  copyBytes: Schema.Number,
+  attachmentBytes: Schema.Number,
+  requiredBytes: Schema.Number,
+  freeBytes: Schema.Number,
+  projects: Schema.Number,
+  threads: Schema.Number,
+  replacedThreads: Schema.Number,
+});
+export type FullImportPlan = typeof FullImportPlanSchema.Type;
+
+export const FullImportPhaseSchema = Schema.Literals([
+  "database",
+  "preparing",
+  "files",
+  "finishing",
+]);
+export type FullImportPhase = typeof FullImportPhaseSchema.Type;
+
+/** One line of the `t3 __full-import` child's stdout, which the desktop app reads. */
+export const FullImportMessageSchema = Schema.Union([
+  Schema.Struct({ type: Schema.Literal("plan"), plan: FullImportPlanSchema }),
+  Schema.Struct({ type: Schema.Literal("phase"), phase: FullImportPhaseSchema }),
+  Schema.Struct({ type: Schema.Literal("done"), backupDir: Schema.String }),
+  Schema.Struct({ type: Schema.Literal("refused"), reason: Schema.String }),
+]);
+export type FullImportMessage = typeof FullImportMessageSchema.Type;
 
 export interface DesktopUpdateActionResult {
   accepted: boolean;
@@ -1157,6 +1186,7 @@ export interface DesktopBridge {
   settingsImport: {
     getState: () => Promise<DesktopSettingsImportState>;
     run: () => Promise<DesktopSettingsImportResult>;
+    runFull: () => Promise<DesktopSettingsImportResult>;
   };
   webLinks: {
     setReady: (ready: boolean) => Promise<void>;

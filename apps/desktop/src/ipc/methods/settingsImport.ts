@@ -32,3 +32,18 @@ export const runSettingsImport = makeIpcMethod({
     return result;
   }),
 });
+
+export const runFullImport = makeIpcMethod({
+  channel: IpcChannels.SETTINGS_IMPORT_RUN_FULL_CHANNEL,
+  payload: Schema.Void,
+  result: DesktopSettingsImportResultSchema,
+  handler: Effect.fn("desktop.ipc.settingsImport.runFull")(function* () {
+    const result = yield* (yield* DesktopSettingsImport.DesktopSettingsImport)
+      .confirmAndQueueFullImport;
+    if (result.imported) {
+      const lifecycle = yield* DesktopLifecycle.DesktopLifecycle;
+      yield* lifecycle.relaunch("full-import").pipe(Effect.forkDetach);
+    }
+    return result;
+  }),
+});

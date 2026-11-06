@@ -135,7 +135,8 @@ it.effect.each([false, true])(
           Effect.provideService(DesktopSettingsImport.DesktopSettingsImport, {
             state: Effect.die("unused"),
             confirmAndImport: Effect.die("unused"),
-            offerOnFirstLaunch: Effect.void,
+            confirmAndQueueFullImport: Effect.die("unused"),
+            beforeBackendStart: Effect.void,
           }),
           Effect.provideService(DesktopClerk.DesktopClerk, {
             configure: Effect.void,
