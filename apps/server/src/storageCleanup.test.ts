@@ -1751,6 +1751,26 @@ describe("orphan worktree reports", () => {
       ),
   );
 
+  it.live("keeps another install's worktree even under a managed folder", () =>
+    runCleanupTest(
+      Effect.gen(function* () {
+        const home = `${(yield* ServerConfig.ServerConfig).worktreesDir}/home`;
+        yield* Effect.gen(function* () {
+          const fixture = yield* cleanupFixture();
+          const moved = `${home}/.t3/worktrees/feature`;
+          yield* fixture.fs.makeDirectory(`${home}/.t3/worktrees`, { recursive: true });
+          yield* fixture.command(fixture.repo, ["worktree", "move", fixture.worktree, moved]);
+          fixture.setThreads([shell({ branch: "feature", worktreePath: moved })]);
+          fixture.setStoredWorktreePaths([moved]);
+          expect((yield* fixture.service.runNow).entries).toEqual([
+            expect.objectContaining({ path: moved, outcome: "kept" }),
+          ]);
+          expect(yield* fixture.fs.exists(moved)).toBe(true);
+        }).pipe(Effect.provideService(HostProcess.HomeDirectory, home));
+      }),
+    ),
+  );
+
   it.live("skips symbolic links at both directory levels and disabled cleanup", () =>
     runCleanupTest(
       Effect.gen(function* () {
