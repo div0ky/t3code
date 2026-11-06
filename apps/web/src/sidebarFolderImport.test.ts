@@ -22,11 +22,11 @@ describe("planLegacySidebarFolderImport", () => {
   it("splits a cross-environment folder and finishes when every environment has imported", () => {
     const first = planLegacySidebarFolderImport(legacy, primary, primary);
     expect(first.operations).toEqual([
-      { action: "create", folderId: "mixed", name: "Mixed" },
-      { action: "move_threads", threadIds: ["a"], folderId: "mixed" },
-      { action: "create", folderId: "empty", name: "Empty" },
+      { action: "create", folderId: "mixed:primary", name: "Mixed" },
+      { action: "move_threads", threadIds: ["a"], folderId: "mixed:primary" },
+      { action: "create", folderId: "empty:primary", name: "Empty" },
     ]);
-    expect(first.collapsedFolderIds).toEqual(["mixed"]);
+    expect(first.collapsedFolderIds).toEqual(["mixed:primary"]);
     expect(first.remaining?.folderIdByThreadKey).toEqual({ [key(remote, "b")]: "mixed" });
 
     const second = planLegacySidebarFolderImport(first.remaining!, remote, primary);
@@ -35,6 +35,15 @@ describe("planLegacySidebarFolderImport", () => {
       { action: "move_threads", threadIds: ["b"], folderId: "mixed:remote" },
     ]);
     expect(second.remaining).toBeNull();
+  });
+
+  it("gives each environment its own folder id even if the home environment changes", () => {
+    const first = planLegacySidebarFolderImport(legacy, primary, primary);
+    const second = planLegacySidebarFolderImport(first.remaining!, remote, remote);
+    const ids = [...first.operations, ...second.operations].flatMap((operation) =>
+      operation.action === "create" ? [operation.folderId] : [],
+    );
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
   it("keeps the local copy until the primary has imported", () => {
