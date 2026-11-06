@@ -22,6 +22,7 @@ import * as Stream from "effect/Stream";
 import * as Electron from "electron";
 
 import * as ElectronDialog from "../electron/ElectronDialog.ts";
+import * as ElectronWindow from "../electron/ElectronWindow.ts";
 import * as DesktopEnvironment from "./DesktopEnvironment.ts";
 import { isForkDesktopVersion } from "./DesktopStatePaths.ts";
 
@@ -126,6 +127,7 @@ export class DesktopSettingsImport extends Context.Service<
 export const make = Effect.gen(function* () {
   const environment = yield* DesktopEnvironment.DesktopEnvironment;
   const dialog = yield* ElectronDialog.ElectronDialog;
+  const electronWindow = yield* ElectronWindow.ElectronWindow;
   const fs = yield* FileSystem.FileSystem;
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const path = environment.path;
@@ -237,24 +239,36 @@ export const make = Effect.gen(function* () {
   const importWithProgress = Effect.scoped(
     Effect.gen(function* () {
       const window = yield* Effect.acquireRelease(
-        Effect.sync(() => {
-          const created = new Electron.BrowserWindow({
-            width: 460,
-            height: 170,
-            title: "Importing from T3 Code",
-            resizable: false,
-            maximizable: false,
-            fullscreenable: false,
-            closable: false,
-            webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false },
-          });
-          void created.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(PROGRESS_PAGE)}`);
-          return created;
-        }),
+        // Auxiliary: the app must not reuse this hidden window as its main window afterwards.
+        electronWindow
+          .create(
+            {
+              width: 460,
+              height: 170,
+              title: "Importing from T3 Code",
+              resizable: false,
+              maximizable: false,
+              fullscreenable: false,
+              closable: false,
+              webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false },
+            },
+            { auxiliary: true },
+          )
+          .pipe(
+            Effect.tap((created) =>
+              Effect.sync(
+                () =>
+                  void created.loadURL(
+                    `data:text/html;charset=utf-8,${encodeURIComponent(PROGRESS_PAGE)}`,
+                  ),
+              ),
+            ),
+            Effect.mapError(() => failFullImport("Could not open the import window.")),
+          ),
         (created) =>
           Effect.sync(() => {
             created.setProgressBar(-1);
-            // Closing the only window would quit on Windows and Linux; the main window replaces it.
+            // Closing the only window would quit on Windows and Linux; the next window replaces it.
             created.hide();
             Electron.app.once("browser-window-created", () => created.destroy());
           }),
