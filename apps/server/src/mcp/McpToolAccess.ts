@@ -155,7 +155,7 @@ export const writes = <P, A, E, R>(
         Effect.tap((caller) =>
           options?.linkedCallers === "allowed"
             ? Effect.void
-            : assertNotLinked(caller, "change this environment's scheduled tasks"),
+            : assertNotLinked(caller, "change this environment's scheduled tasks or folders"),
         ),
         Effect.flatMap(() => handle(params)),
       ),

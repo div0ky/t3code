@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 import * as Schema from "effect/Schema";
 
-import { type CommandId, ProjectId } from "./baseSchemas.ts";
+import { type CommandId, ProjectId, ThreadId } from "./baseSchemas.ts";
 import {
   ProviderDriverKind,
   ProviderInstanceEnvironment,
@@ -22,6 +22,7 @@ import {
   ServerSettings,
   ServerSettingsPatch,
   withIdleCompaction,
+  applySidebarFolderOperation,
 } from "./settings.ts";
 
 const decodeClientSettings = Schema.decodeUnknownSync(ClientSettingsSchema);
@@ -536,5 +537,50 @@ describe("server model preferences", () => {
     const input = { favorites: [], providerModelPreferences: {} };
     expect(encodeServerSettings(decodeServerSettings(input))).toMatchObject(input);
     expect(decodeServerSettingsPatch(input)).toEqual(input);
+  });
+});
+
+describe("applySidebarFolderOperation", () => {
+  const threadA = ThreadId.make("a");
+  const threadB = ThreadId.make("b");
+  const folders = [
+    { id: "work", name: "Work", threadIds: [threadA, threadB] },
+    { id: "home", name: "Home", threadIds: [] },
+  ];
+
+  it("moves threads out of their old folder, and out of all folders for null", () => {
+    expect(
+      applySidebarFolderOperation(folders, {
+        action: "move_threads",
+        threadIds: [threadA],
+        folderId: "home",
+      }),
+    ).toEqual([
+      { id: "work", name: "Work", threadIds: [threadB] },
+      { id: "home", name: "Home", threadIds: [threadA] },
+    ]);
+    expect(
+      applySidebarFolderOperation(folders, {
+        action: "move_threads",
+        threadIds: [threadA, threadB],
+        folderId: null,
+      })[0]?.threadIds,
+    ).toEqual([]);
+  });
+
+  it("keeps threads where they are when the target folder is gone", () => {
+    expect(
+      applySidebarFolderOperation(folders, {
+        action: "move_threads",
+        threadIds: [threadA],
+        folderId: "deleted",
+      }),
+    ).toBe(folders);
+  });
+
+  it("does not duplicate a folder when create is retried", () => {
+    expect(
+      applySidebarFolderOperation(folders, { action: "create", folderId: "work", name: "Again" }),
+    ).toBe(folders);
   });
 });
