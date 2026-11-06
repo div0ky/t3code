@@ -270,7 +270,7 @@ export const runFullImport = Effect.fn("fullImport.run")(function* (input: {
   const stagedDatabase = NodePath.join(stagingDir, DATABASE);
   const attempt = <A>(message: string, run: () => A) =>
     Effect.try({ try: run, catch: (cause) => fail(`${message}: ${String(cause)}`) });
-  const inUse = `This app's data is still in use, so it was left as it is. Quit every T3 Code (div0ky) window and server and try again`;
+  const inUse = `This app's data is still in use, so it was left as it is. Quit every D5 Code window and server and try again`;
 
   yield* attempt(inUse, () => assertTargetNotInUse(input.targetDir));
   yield* attempt("Could not prepare the import", () => {

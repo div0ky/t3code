@@ -52,7 +52,7 @@ const PROGRESS_PAGE = `<!doctype html><meta charset="utf-8"><title>Importing</ti
 <body style="margin:20px;font:13px system-ui;color-scheme:light dark">
 <p id="label" style="margin:0 0 12px">Starting the import</p>
 <progress id="bar" max="1" style="width:100%"></progress>
-<p style="margin:12px 0 0;opacity:.7">T3 Code opens when this finishes. Your current data stays untouched until then.</p>
+<p style="margin:12px 0 0;opacity:.7">D5 Code opens when this finishes. Your current data stays untouched until then.</p>
 <script>function update(label, value) {
   document.getElementById("label").textContent = label;
   document.getElementById("bar").value = value;
