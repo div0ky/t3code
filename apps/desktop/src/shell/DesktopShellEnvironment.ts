@@ -597,7 +597,10 @@ export const make = Effect.gen(function* () {
   const refresh = Effect.gen(function* () {
     // Refresh from the inherited baseline so removed cached paths and values do not survive.
     const fresh = { ...inherited };
-    const prepared = yield* installShellEnvironment({ env: fresh, platform: environment.platform });
+    const attempt = installShellEnvironment({ env: fresh, platform: environment.platform });
+    // A keychain prompt blocks the main process long enough to expire the probe's timeout. With no
+    // cache yet, a failure here would leave the whole session on launchd's bare PATH.
+    const prepared = (yield* attempt) || (environment.platform !== "win32" && (yield* attempt));
     const patch = Object.fromEntries(
       Object.keys(ShellEnvironmentPatch.fields).map((name) => [name, fresh[name] ?? null]),
     );

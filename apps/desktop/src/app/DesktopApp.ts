@@ -29,6 +29,7 @@ import * as DesktopPreReadyPlatform from "./DesktopPreReadyPlatform.ts";
 import * as DesktopShutdown from "./DesktopShutdown.ts";
 import * as DesktopServerExposure from "../backend/DesktopServerExposure.ts";
 import * as DesktopAppSettings from "../settings/DesktopAppSettings.ts";
+import * as DesktopSettingsImport from "./DesktopSettingsImport.ts";
 import * as DesktopShellEnvironment from "../shell/DesktopShellEnvironment.ts";
 import * as DesktopStartupRecovery from "./DesktopStartupRecovery.ts";
 import * as DesktopState from "./DesktopState.ts";
@@ -346,6 +347,7 @@ const startup = Effect.gen(function* () {
   yield* DesktopStartupRecovery.listen;
   // Portal identity is prepared pre-ready; MIME helpers must not gate the backend or window.
   yield* linuxUrlHandler.register.pipe(Effect.forkScoped);
+  yield* (yield* DesktopSettingsImport.DesktopSettingsImport).offerOnFirstLaunch;
   yield* bootstrap.pipe(Effect.catchCause((cause) => fatalStartupCause("bootstrap", cause)));
 }).pipe(Effect.withSpan("desktop.startup"));
 

@@ -599,10 +599,37 @@ describe("DesktopShellEnvironment", () => {
         },
       });
 
-      assert.deepEqual(commands, ["/opt/homebrew/bin/nu", "/bin/zsh", "/bin/launchctl"]);
+      assert.deepEqual(commands.slice(0, 3), [
+        "/opt/homebrew/bin/nu",
+        "/bin/zsh",
+        "/bin/launchctl",
+      ]);
       assert.equal(env.PATH, "/opt/homebrew/bin:/usr/bin");
       assert.isFalse(prepared);
     }),
+  );
+
+  it.effect(
+    "retries a failed discovery so one stalled probe cannot cost the session its PATH",
+    () =>
+      Effect.gen(function* () {
+        const env: NodeJS.ProcessEnv = { SHELL: "/bin/zsh", PATH: "/usr/bin" };
+        let launchctlCalled = false;
+        const prepared = yield* runShellEnvironment({
+          env,
+          platform: "darwin",
+          handler: (command) => {
+            if (command._tag !== "StandardCommand") return "";
+            if (command.command === "/bin/launchctl") launchctlCalled = true;
+            return launchctlCalled && command.command !== "/bin/launchctl"
+              ? envOutput({ PATH: "/fresh/bin:/usr/bin" })
+              : "";
+          },
+        });
+
+        assert.isTrue(prepared);
+        assert.equal(env.PATH, "/fresh/bin:/usr/bin");
+      }),
   );
 
   it.effect("leaves macOS preparation incomplete when no login shell returns a PATH", () =>

@@ -78,7 +78,7 @@ export type DesktopUpdateStatus =
 export type DesktopRuntimeArch = "arm64" | "x64" | "other";
 export type DesktopTheme = "light" | "dark" | "system";
 export type DesktopUpdateChannel = "latest" | "nightly";
-export type DesktopAppStageLabel = "Alpha" | "Beta" | "Dev" | "Fork" | "Nightly";
+export type DesktopAppStageLabel = "Alpha" | "Beta" | "Dev" | "div0ky" | "Nightly";
 
 export const DesktopUpdateStatusSchema = Schema.Literals([
   "disabled",
@@ -97,7 +97,7 @@ export const DesktopAppStageLabelSchema = Schema.Literals([
   "Alpha",
   "Beta",
   "Dev",
-  "Fork",
+  "div0ky",
   "Nightly",
 ]);
 
@@ -344,6 +344,15 @@ export const DesktopCliCommandStateSchema = Schema.Struct({
   launcherPath: Schema.NullOr(Schema.String),
 });
 export type DesktopCliCommandState = typeof DesktopCliCommandStateSchema.Type;
+
+export const DesktopSettingsImportStateSchema = Schema.Struct({
+  available: Schema.Boolean,
+  sourcePath: Schema.String,
+});
+export type DesktopSettingsImportState = typeof DesktopSettingsImportStateSchema.Type;
+
+export const DesktopSettingsImportResultSchema = Schema.Struct({ imported: Schema.Boolean });
+export type DesktopSettingsImportResult = typeof DesktopSettingsImportResultSchema.Type;
 
 export interface DesktopUpdateActionResult {
   accepted: boolean;
@@ -1144,6 +1153,10 @@ export interface DesktopBridge {
     getState: () => Promise<DesktopCliCommandState>;
     install: () => Promise<DesktopCliCommandState>;
     uninstall: () => Promise<DesktopCliCommandState>;
+  };
+  settingsImport: {
+    getState: () => Promise<DesktopSettingsImportState>;
+    run: () => Promise<DesktopSettingsImportResult>;
   };
   webLinks: {
     setReady: (ready: boolean) => Promise<void>;
