@@ -1206,6 +1206,12 @@ export function createServerEnvironmentAtoms<R, E>(
 
   return {
     configValueAtom,
+    updateSidebarFolders: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:update-sidebar-folders",
+      tag: WS_METHODS.serverUpdateSidebarFolders,
+      scheduler: configScheduler,
+      concurrency: configConcurrency,
+    }),
     runStorageCleanup: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:server:run-storage-cleanup",
       tag: WS_METHODS.serverRunStorageCleanup,

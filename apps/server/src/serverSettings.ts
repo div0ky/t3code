@@ -16,6 +16,8 @@ import {
   ServerSettings,
   ServerSettingsError,
   type ServerSettingsPatch,
+  type SidebarFolderOperation,
+  applySidebarFolderOperation,
   type ManagedPolicySummary,
   globalIdleCompaction,
   isSecretReference,
@@ -138,6 +140,14 @@ const normalizeServerSettings = (
         }),
     ),
   );
+
+const withSidebarFolderOperation = (
+  settings: ServerSettings,
+  operation: SidebarFolderOperation,
+): ServerSettings => ({
+  ...settings,
+  sidebarFolders: applySidebarFolderOperation(settings.sidebarFolders, operation),
+});
 
 export function redactServerSettingsForClient(
   settings: ServerSettings,
@@ -271,6 +281,11 @@ export class ServerSettingsService extends Context.Service<
       patch?: ServerSettingsPatch,
     ) => Effect.Effect<ServerSettings, ServerSettingsError>;
 
+    /** Applied under the write lock, so concurrent moves cannot overwrite each other. */
+    readonly updateSidebarFolders: (
+      operation: SidebarFolderOperation,
+    ) => Effect.Effect<ServerSettings, ServerSettingsError>;
+
     readonly withSettingsSnapshot: <A, E, R>(
       use: (settings: ServerSettings) => Effect.Effect<A, E, R>,
     ) => Effect.Effect<A, E | ServerSettingsError, R>;
@@ -335,6 +350,10 @@ const makeTest = Effect.fn("serverSettings.makeTest")(function* (
           const patched = applyServerSettingsPatch(currentSettings, patch);
           return applyProviderInstanceMutation(patched, mutation);
         }),
+      ),
+    updateSidebarFolders: (operation) =>
+      updateTestSettings((currentSettings) =>
+        Effect.succeed(withSidebarFolderOperation(currentSettings, operation)),
       ),
     withSettingsSnapshot: (use) =>
       writeSemaphore.withPermits(1)(getSettings.pipe(Effect.flatMap(use))),
@@ -1356,6 +1375,10 @@ const make = Effect.gen(function* () {
           const patched = applyServerSettingsPatch(current, patch);
           return applyProviderInstanceMutation(patched, mutation);
         }),
+      ),
+    updateSidebarFolders: (operation) =>
+      updateAndPersistSettings({}, (current) =>
+        Effect.succeed(withSidebarFolderOperation(current, operation)),
       ),
     withSettingsSnapshot,
     get streamChanges() {

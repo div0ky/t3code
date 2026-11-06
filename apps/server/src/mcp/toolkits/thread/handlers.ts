@@ -6,7 +6,9 @@ import {
   type RunId,
   OrchestratorMcpFailure,
   type OrchestrationV2Command,
+  type SidebarFolderOperation,
 } from "@t3tools/contracts";
+import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Effect from "effect/Effect";
 import { modelSelectionCommandType } from "@t3tools/shared/model";
 
@@ -21,6 +23,7 @@ import {
 } from "../../threadAccess.ts";
 import * as ThreadSearch from "../../../orchestration-v2/ThreadSearch.ts";
 import * as ScheduledTasks from "../../../scheduledTasks/ScheduledTaskService.ts";
+import * as Settings from "../../../serverSettings.ts";
 import { queuedRunsInDeliveryOrder } from "../../../orchestration-v2/QueuedRunOrder.ts";
 import { ThreadToolkit } from "./tools.ts";
 
@@ -90,7 +93,70 @@ const writesThread = <P extends { readonly threadId?: ThreadId | undefined }, A,
   handle: (params: P) => Effect.Effect<A, E, R>,
 ) => McpToolAccess.writesThreads((params: P) => [params.threadId], handle);
 
+const organizeFolders = Effect.fn("mcp.organizeFolders")(function* (input: {
+  readonly action: "create" | "rename" | "delete" | "move_threads" | "remove_threads";
+  readonly folderId?: string | undefined;
+  readonly name?: string | undefined;
+  readonly threadIds?: ReadonlyArray<ThreadId> | undefined;
+}) {
+  const settings = yield* Settings.ServerSettingsService;
+  const existingFolderId = Effect.gen(function* () {
+    const folderId = yield* required(input.folderId, "folderId");
+    const { sidebarFolders } = yield* settings.getSettings.pipe(Effect.mapError(unavailable));
+    if (sidebarFolders.some((folder) => folder.id === folderId)) return folderId;
+    return yield* new OrchestratorMcpFailure({
+      code: "invalid_request",
+      message: "The folder was not found. Call t3_folder_list for its id.",
+    });
+  });
+  let operation: SidebarFolderOperation;
+  switch (input.action) {
+    case "create": {
+      const random = yield* SecureRandom.SecureRandom;
+      operation = {
+        action: "create",
+        name: yield* required(input.name, "name"),
+        folderId: yield* random.uuidV4(),
+      };
+      break;
+    }
+    case "rename":
+      operation = {
+        action: "rename",
+        name: yield* required(input.name, "name"),
+        folderId: yield* existingFolderId,
+      };
+      break;
+    case "delete":
+      operation = { action: "delete", folderId: yield* existingFolderId };
+      break;
+    default: {
+      const folderId = input.action === "move_threads" ? yield* existingFolderId : null;
+      const threadIds = yield* Effect.forEach(input.threadIds ?? [undefined], (threadId) =>
+        readThread(threadId).pipe(Effect.map(({ projection }) => projection.thread.id)),
+      );
+      operation = { action: "move_threads", threadIds, folderId };
+    }
+  }
+  const updated = yield* settings
+    .updateSidebarFolders(operation)
+    .pipe(Effect.mapError(unavailable));
+  return { folders: updated.sidebarFolders };
+});
+
 export const layer = McpToolAccess.toLayer(ThreadToolkit, {
+  t3_folder_list: McpToolAccess.reads(() =>
+    Effect.gen(function* () {
+      const settings = yield* Settings.ServerSettingsService;
+      const { sidebarFolders } = yield* settings.getSettings.pipe(Effect.mapError(unavailable));
+      return { folders: sidebarFolders };
+    }),
+  ),
+  t3_folder_organize: McpToolAccess.either(
+    (input) => input.action === "move_threads" || input.action === "remove_threads",
+    McpToolAccess.writesThreads((input) => input.threadIds ?? [undefined], organizeFolders),
+    McpToolAccess.writes(organizeFolders),
+  ),
   run_scheduled_task_now: McpToolAccess.writesEnvironment((input) =>
     Effect.gen(function* () {
       const scheduler = yield* ScheduledTasks.ScheduledTaskService;

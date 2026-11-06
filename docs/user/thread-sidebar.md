@@ -141,8 +141,13 @@ hidden thread needs you. Right-click a header to rename or delete it. Deleting a
 threads.
 
 Folders hold active threads. Pinning, snoozing, or settling a thread moves it to that section as
-usual, and it returns to its folder when it becomes active again. Folders are saved on this device
-and client only, and are hidden while **Boring sidebar** is on.
+usual, and it returns to its folder when it becomes active again. Folders are hidden while
+**Boring sidebar** is on.
+
+Folders belong to an environment, so every web and desktop client connected to it sees the same
+ones, and agents can organize them for you. A thread can only join a folder in its own environment.
+A new folder goes in the environment of the thread you have open. Whether a folder is collapsed is
+saved per client.
 
 ### Fold working threads (beta)
 

@@ -9,6 +9,7 @@ import {
   ProjectScript,
   ProviderDriverKind,
   ProviderInstanceId,
+  ThreadId,
   resolveProviderInstanceEnabled,
   SecretProviderId,
   ServerSettings,
@@ -165,6 +166,25 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
         "luna",
       ]);
       assert.deepEqual(settings.providerModelPreferences?.[provider]?.modelOrder, ["luna", "sol"]);
+    }).pipe(Effect.provide(layerServerSettings())),
+  );
+  it.effect("keeps every concurrent folder move and persists the result", () =>
+    Effect.gen(function* () {
+      const service = yield* ServerSettingsModule.ServerSettingsService;
+      const threadIds = ["a", "b", "c", "d"].map((id) => ThreadId.make(id));
+      yield* service.updateSidebarFolders({ action: "create", folderId: "work", name: "Work" });
+      yield* Effect.forEach(
+        threadIds,
+        (threadId) =>
+          service.updateSidebarFolders({
+            action: "move_threads",
+            threadIds: [threadId],
+            folderId: "work",
+          }),
+        { concurrency: "unbounded" },
+      );
+      const { sidebarFolders } = yield* service.getSettings;
+      assert.deepEqual(sidebarFolders[0]?.threadIds.toSorted(), threadIds);
     }).pipe(Effect.provide(layerServerSettings())),
   );
   it.effect("persists and broadcasts model preferences to other connected clients", () =>
