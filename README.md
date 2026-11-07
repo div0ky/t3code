@@ -12,7 +12,7 @@ D5 Code still uses T3 Connect for remote access, which needs your T3 account. Th
 - The `~/.t3-fork` state directory, `com.div0ky.t3code` bundle ID, `t3code-fork` URL scheme, and `t3code-div0ky` keychain item.
 - T3 Connect itself, its relay, and `app.t3.codes` links.
 
-`t3 update` and the T3 Code install scripts still install upstream T3 Code.
+The T3 Code install scripts still install upstream T3 Code. D5 Code releases carry no CLI archives yet, so `t3 update` and SSH environments have no D5 runtime to download.
 
 ## Build the desktop app
 
@@ -24,6 +24,19 @@ vp run dist:desktop:d5
 ```
 
 The DMG lands in `release/`. First launch offers to copy your settings from T3 Code.
+
+## Publish an update
+
+D5 Code has its own version and updates from this repo's GitHub Releases. Installed apps only take a higher version than their own.
+
+1. Set the new version in `apps/desktop`, `apps/server`, `apps/web`, and `packages/contracts`.
+2. Build it, then publish the build as the latest release:
+
+```bash
+vp run dist:desktop:d5
+VERSION=$(node -p "require('./apps/server/package.json').version")
+gh release create "v$VERSION" release/D5-Code-* release/latest-mac.yml --latest --generate-notes
+```
 
 ## Documentation
 

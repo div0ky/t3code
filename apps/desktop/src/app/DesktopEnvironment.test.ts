@@ -73,13 +73,13 @@ describe("DesktopEnvironment", () => {
     }),
   );
 
-  it.effect("keeps a fork build's state and identity apart from an official install", () =>
+  it.effect("keeps a packaged build's state and identity apart from a T3 Code install", () =>
     Effect.gen(function* () {
-      const fork = yield* makeEnvironment({ appVersion: "0.1.7-fork.1" });
+      const packaged = yield* makeEnvironment({ appVersion: "0.1.0", isPackaged: true });
 
-      assert.equal(fork.stateDir, "/Users/alice/.t3-fork/userdata");
-      assert.equal(fork.displayName, "D5 Code");
-      assert.equal(fork.appUserModelId, "com.div0ky.t3code");
+      assert.equal(packaged.stateDir, "/Users/alice/.t3-fork/userdata");
+      assert.equal(packaged.displayName, "D5 Code");
+      assert.equal(packaged.appUserModelId, "com.div0ky.t3code");
     }),
   );
 });
