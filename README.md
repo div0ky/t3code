@@ -34,6 +34,7 @@ D5 Code has its own version and updates from this repo's GitHub Releases. Instal
 
 ```bash
 vp run dist:desktop:d5
+VERSION=$(node -p "require('./apps/server/package.json').version")
 gh release create "v$VERSION" release/D5-Code-* release/latest-mac.yml --latest --generate-notes
 ```
 
