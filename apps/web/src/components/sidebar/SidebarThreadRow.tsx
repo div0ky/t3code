@@ -43,6 +43,7 @@ import {
   CircleDashedIcon,
   CircleDotDashedIcon,
   ClockIcon,
+  FolderIcon,
   GitBranchIcon,
   MessageCircleQuestionIcon,
   PinIcon,
@@ -67,6 +68,7 @@ import {
 import { useRightPanelStore } from "../../rightPanelStore";
 import { useOpenPrLink } from "../../lib/openPullRequestLink";
 import { useUiStateStore } from "../../uiStateStore";
+import { useSidebarFoldersStore } from "../../sidebarFoldersStore";
 import { useThreadSelectionStore } from "../../threadSelectionStore";
 import { useNowMinute } from "../../hooks/useNowMinute";
 import { useNowSecond } from "../../hooks/useNowSecond";
@@ -656,6 +658,12 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
   } = props;
   const threadRef = scopeThreadRef(thread.environmentId, thread.id);
   const threadKey = scopedThreadKey(threadRef);
+  const folderName = useSidebarFoldersStore((state) =>
+    thread.pinnedAt != null && thread.globallyPinned
+      ? (state.folders.find((folder) => folder.id === state.folderIdByThreadKey[threadKey])?.name ??
+        null)
+      : null,
+  );
   const canOperateThread = useEnvironmentScope(thread.environmentId, AuthOrchestrationOperateScope);
   const { leaseLiveStatus, rowRef: leaseRowRef } = useSidebarRowSubscriptionLease(props.isActive);
   const { revealRef } = props;
@@ -1455,6 +1463,22 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
               ) : (
                 <span className="flex-1" />
               )}
+              {folderName ? (
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <span
+                        className="inline-flex min-w-0 max-w-1/2 items-center gap-1 text-xs text-secondary-label"
+                        aria-label={`Folder: ${folderName}`}
+                      />
+                    }
+                  >
+                    <FolderIcon aria-hidden className="size-3 shrink-0" />
+                    <span className="truncate">{folderName}</span>
+                  </TooltipTrigger>
+                  <TooltipPopup side="top">Folder: {folderName}</TooltipPopup>
+                </Tooltip>
+              ) : null}
               {sortable?.isDragging ? (
                 dragDestination
               ) : (
