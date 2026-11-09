@@ -1108,6 +1108,9 @@ describe("Working shelf (beta)", () => {
       const withUrgent = [marker("urgent-header"), row("u1", "urgent"), ...items];
       expect(resolveSidebarDropTarget(withUrgent, "a1", "u1")).toBeNull();
       expect(
+        resolveSidebarDropTarget(withUrgent, "a1", sidebarMarkerId("urgent-header")),
+      ).toBeNull();
+      expect(
         resolveSidebarDropTarget(withUrgent, "a1", sidebarMarkerId("pinned-header")),
       ).toMatchObject({ section: "pinned", pinnedOrder: ["a1", "p1"] });
       expect(resolveSidebarDropTarget(withUrgent, "a1", "p1")).toMatchObject({

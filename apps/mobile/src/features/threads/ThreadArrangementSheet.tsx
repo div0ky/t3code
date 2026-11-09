@@ -206,8 +206,9 @@ function ThreadArrangementSheet(props: { onClose: () => void }) {
         !visible.has(keyOf(thread)) &&
         // Urgent rows leave the ordered sections without being parked.
         (thread.urgentAt == null ||
-          thread.settledOverride === "settled" ||
-          effectiveSnoozed(thread, { now })),
+          effectiveSnoozed(thread, { now }) ||
+          (thread.settledOverride === "settled" &&
+            queuedThreadKeys?.has(`${thread.environmentId}:${thread.id}`) !== true)),
     );
     return {
       pinned,

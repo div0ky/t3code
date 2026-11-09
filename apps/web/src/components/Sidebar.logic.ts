@@ -266,6 +266,7 @@ export function resolveSidebarDropTarget(
   // A folder header always means "into this folder", from either direction, so a collapsed folder
   // accepts drops from below too.
   const overItem = items[overIndex];
+  if (overItem?.kind === "marker" && overItem.marker === "urgent-header") return null;
   const dropsBelowOver =
     isSidebarFolderItem(overItem) ||
     (overItem?.kind === "marker" && overItem.marker === "pinned-header");
