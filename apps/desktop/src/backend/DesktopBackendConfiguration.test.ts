@@ -28,6 +28,7 @@ const layerShellEnvironment = (prepared = true) =>
     awaitEnvironment: Effect.void,
     installIntoProcess: Effect.succeed(prepared),
     awaitDiscovery: Effect.succeed(prepared),
+    awaitUserShellDiscovery: Effect.succeed(prepared),
     updates: Stream.empty,
   });
 
