@@ -411,6 +411,22 @@ it.effect(
         assert.ok(shell);
         assert.equal(shell.autoSettleDisabledAt == null, enabled);
       }
+      const updatedAtBeforeUrgent = (yield* projections.getThreadProjection(threadId)).thread
+        .updatedAt;
+      for (const urgent of [true, false]) {
+        yield* orchestrator.dispatch({
+          type: "thread.urgent.set",
+          commandId: CommandId.make(`urgent-${urgent}`),
+          threadId,
+          urgent,
+        });
+        const updated = yield* projections.getThreadProjection(threadId);
+        assert.equal(updated.thread.urgentAt != null, urgent);
+        assert.deepStrictEqual(updated.thread.updatedAt, updatedAtBeforeUrgent);
+        const shell = yield* projections.getThreadShell(threadId);
+        assert.ok(shell);
+        assert.equal(shell.urgentAt != null, urgent);
+      }
       yield* sql`INSERT INTO orchestration_v2_projection_messages
       (message_id, thread_id, run_id, node_id, role, streaming, created_at, updated_at, payload_json)
       VALUES ('obsolete', ${threadId}, NULL, NULL, 'assistant', 0, ${DateTime.formatIso(now)}, ${DateTime.formatIso(now)}, '{"obsolete":true}')`;
@@ -653,10 +669,17 @@ it.effect(
       });
       assert.isAbove(fresh.turnItems.at(-1)!.ordinal, 900);
       yield* orchestrator.dispatch({
+        type: "thread.urgent.set",
+        commandId: CommandId.make("urgent-before-archive"),
+        threadId,
+        urgent: true,
+      });
+      yield* orchestrator.dispatch({
         type: "thread.archive",
         commandId: CommandId.make("archive-with-old-history"),
         threadId,
       });
+      assert.isNull((yield* projections.getThread(threadId)).urgentAt);
       yield* orchestrator.dispatch({
         type: "thread.delete",
         commandId: CommandId.make("delete-with-old-history"),

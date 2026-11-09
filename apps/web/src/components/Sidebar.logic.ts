@@ -1023,8 +1023,11 @@ export function resolveSidebarThreadStatus(thread: SidebarThreadStatusInput): Si
  * hidden threads. Waiting threads stay quiet, like their rows.
  */
 export function resolveSidebarFolderDot(
-  threads: ReadonlyArray<ThreadStatusInput & SidebarThreadStatusInput>,
-): "attention" | "failed" | "unread" | "working" | null {
+  threads: ReadonlyArray<
+    ThreadStatusInput & SidebarThreadStatusInput & { readonly urgentAt?: string | null }
+  >,
+): "urgent" | "attention" | "failed" | "unread" | "working" | null {
+  if (threads.some((thread) => thread.urgentAt != null)) return "urgent";
   const statuses = new Set(threads.map(resolveSidebarThreadStatus));
   if (
     statuses.has("input") ||

@@ -525,6 +525,20 @@ export const setThreadAutoSettle = Effect.fn("EnvironmentCommands.setThreadAutoS
   });
 });
 
+export interface SetThreadUrgentInput extends ThreadCommandInput {
+  readonly urgent: boolean;
+}
+export const setThreadUrgent = Effect.fn("EnvironmentCommands.setThreadUrgent")(function* (
+  input: SetThreadUrgentInput,
+) {
+  return yield* dispatch({
+    type: "thread.urgent.set",
+    commandId: yield* allocateCommandId(input),
+    threadId: input.threadId,
+    urgent: input.urgent,
+  });
+});
+
 export const reorderPinnedThread = Effect.fn("EnvironmentCommands.reorderPinnedThread")(function* (
   input: ReorderPinnedThreadInput,
 ) {

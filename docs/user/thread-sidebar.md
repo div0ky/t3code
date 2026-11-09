@@ -57,6 +57,13 @@ in a new thread's model picker to add or remove them. A regular click returns to
 single model. Choose a base branch and send. Each selection starts a separate thread
 and worktree while you stay in the new thread composer. This requires a Git project.
 
+## Flag urgent threads
+
+Choose **Mark urgent** from a thread's menu to make it stand out in the sidebar. A
+closed folder shows a red dot when it holds an urgent thread. **Clear urgent** removes
+the flag. Archiving also removes it, and unarchiving does not bring it back. Urgent threads
+are not auto-settled.
+
 ## Pin and reorder threads
 
 Pin a thread from its menu to keep it at the top of its folder. Choose **Pin Globally**

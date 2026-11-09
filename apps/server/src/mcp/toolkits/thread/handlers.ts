@@ -425,6 +425,14 @@ export const layer = McpToolAccess.toLayer(ThreadToolkit, {
         case "mark_unread":
           command = { ...common, type: "thread.mark-unread" };
           break;
+        case "mark_urgent":
+        case "clear_urgent":
+          command = {
+            ...common,
+            type: "thread.urgent.set",
+            urgent: input.action === "mark_urgent",
+          };
+          break;
         default:
           command = { ...common, type: `thread.${input.action}` };
       }

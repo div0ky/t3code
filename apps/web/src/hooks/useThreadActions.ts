@@ -295,6 +295,9 @@ export function useThreadActions() {
   const unpinThreadMutation = useOrchestrationCommand(threadEnvironment.unpin, {
     reportFailure: false,
   });
+  const setThreadUrgentMutation = useOrchestrationCommand(threadEnvironment.setUrgent, {
+    reportFailure: false,
+  });
   const setThreadAutoSettleMutation = useOrchestrationCommand(threadEnvironment.setAutoSettle, {
     reportFailure: false,
   });
@@ -710,6 +713,12 @@ export function useThreadActions() {
     });
   };
 
+  const setThreadUrgent = (target: ScopedThreadRef, urgent: boolean) =>
+    setThreadUrgentMutation({
+      environmentId: target.environmentId,
+      input: { threadId: target.threadId, urgent },
+    });
+
   const setThreadAutoSettle = async (target: ScopedThreadRef, enabled: boolean) => {
     if (!readEnvironmentSupportsAutoSettleOptOut(target.environmentId)) {
       return AsyncResult.failure(
@@ -1018,6 +1027,7 @@ export function useThreadActions() {
     reorderActiveThread,
     markThreadUnread,
     setThreadAutoSettle,
+    setThreadUrgent,
     turnThreadIntoProject: (target: ScopedThreadRef) =>
       createProjectFromThread({
         environmentId: target.environmentId,

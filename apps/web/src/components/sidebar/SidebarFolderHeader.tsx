@@ -14,6 +14,7 @@ import {
 import { SortableSidebarMarker } from "./SidebarListMarkers";
 
 const DOT_CLASS_NAME = {
+  urgent: "bg-error",
   attention: "bg-warning",
   failed: "bg-error",
   unread: "bg-success",

@@ -30,6 +30,7 @@ import { readEnvironmentScope } from "../state/session";
 import {
   readEnvironmentServerConfigLoaded,
   readEnvironmentSupportsAutoSettleOptOut,
+  readEnvironmentSupportsUrgentFlag,
   readThreadShell,
   useProjects,
 } from "../state/entities";
@@ -83,6 +84,7 @@ export function useThreadActionMenu(input: {
     pinThread,
     confirmAndUnpinThread,
     setThreadAutoSettle,
+    setThreadUrgent,
     archiveThread,
     deleteThread,
     markThreadUnread,
@@ -127,6 +129,7 @@ export function useThreadActionMenu(input: {
       const supports = {
         settlement: configLoaded,
         autoSettleOptOut: readEnvironmentSupportsAutoSettleOptOut(threadRef.environmentId),
+        urgent: readEnvironmentSupportsUrgentFlag(threadRef.environmentId),
         snooze: configLoaded,
         pinning: configLoaded,
         titleRegeneration: configLoaded,
@@ -142,6 +145,7 @@ export function useThreadActionMenu(input: {
         isGloballyPinned: thread.globallyPinned === true,
         isSettled: supports.settlement && thread.settledOverride === "settled",
         autoSettleEnabled: thread.autoSettleDisabledAt == null,
+        isUrgent: thread.urgentAt != null,
         isSnoozed: supports.snooze && effectiveSnoozed(thread, { now: now.toISOString() }),
         canSnoozeNow: canSnooze(thread, { now: now.toISOString() }),
         isRegeneratingTitle,
@@ -245,6 +249,12 @@ export function useThreadActionMenu(input: {
           await reportFailure("Failed to unpin thread", () => confirmAndUnpinThread(threadRef));
           return;
         }
+        case "urgent":
+        case "unurgent":
+          await reportFailure("Failed to update urgent flag", () =>
+            setThreadUrgent(threadRef, action === "urgent"),
+          );
+          break;
         case "auto-settle:enabled":
         case "auto-settle:disabled":
           await reportFailure("Failed to update auto-settle", () =>

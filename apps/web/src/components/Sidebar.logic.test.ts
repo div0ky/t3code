@@ -1634,6 +1634,9 @@ describe("resolveSidebarFolderDot", () => {
     };
 
     expect(resolveSidebarFolderDot([idle])).toBeNull();
+    expect(
+      resolveSidebarFolderDot([limited, { ...idle, urgentAt: "2026-03-09T10:05:00.000Z" }]),
+    ).toBe("urgent");
     // A waiting thread stays quiet even with an unread completion, like its row.
     expect(
       resolveSidebarFolderDot([{ ...unread, runtime: { ...runtime, status: "idle" as const } }]),

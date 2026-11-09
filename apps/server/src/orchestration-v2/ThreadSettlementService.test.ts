@@ -146,6 +146,12 @@ describe("isAutoSettlementCandidate", () => {
     ).toBe(true);
   });
 
+  it("never auto-settles an urgent thread", () => {
+    expect(
+      ThreadSettlementService.isAutoSettlementCandidate(shell({ urgentAt: at(-1) }), NOW_MS),
+    ).toBe(false);
+  });
+
   it("never settles, or keeps snoozed, a thread whose guest is waiting on the owner", () => {
     expect(
       ThreadSettlementService.isAutoSettlementCandidate(
