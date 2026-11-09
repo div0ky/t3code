@@ -8,11 +8,11 @@ import type { SidebarProjectSnapshot } from "../../sidebarProjectGrouping";
 import { useUiStateStore } from "../../uiStateStore";
 import { resolveSidebarFolderDot, resolveThreadLastVisitedAt } from "../Sidebar.logic";
 import { ProjectFavicon } from "../ProjectFavicon";
+import { SidebarUrgentCountBadge } from "./SidebarListMarkers";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
 const FOLDER_DOT_CLASS_NAME = {
-  urgent: "bg-error",
   attention: "bg-warning",
   failed: "bg-error",
   unread: "bg-success",
@@ -20,7 +20,6 @@ const FOLDER_DOT_CLASS_NAME = {
 } as const;
 
 const FOLDER_DOT_LABEL = {
-  urgent: ", urgent",
   attention: ", needs you",
   failed: ", failed",
   unread: ", done",
@@ -40,12 +39,14 @@ export function sidebarFolderRowId(projectKey: string) {
 export const SidebarProjectFolderHeader = memo(function SidebarProjectFolderHeader(props: {
   group: SidebarProjectSnapshot;
   collapsed: boolean;
+  urgentCount: number;
   hiddenThreads: readonly EnvironmentThreadShell[];
   onToggle: (group: SidebarProjectSnapshot) => void;
   onNewThread: (group: SidebarProjectSnapshot) => void;
   onContextMenu: (group: SidebarProjectSnapshot, position: { x: number; y: number }) => void;
 }) {
-  const { group, collapsed, hiddenThreads } = props;
+  const { group, collapsed, hiddenThreads, urgentCount } = props;
+  const showsCount = collapsed && hiddenThreads.length > 0;
   const rowId = sidebarFolderRowId(group.projectKey);
   const localLastVisitedAtById = useUiStateStore((state) => state.threadLastVisitedAtById);
   const dot = collapsed
@@ -81,12 +82,19 @@ export const SidebarProjectFolderHeader = memo(function SidebarProjectFolderHead
         <span className="min-w-0 flex-1 truncate text-sm font-medium text-sidebar-foreground/90">
           {group.displayName}
         </span>
+        {urgentCount > 0 ? (
+          <SidebarUrgentCountBadge
+            count={urgentCount}
+            // Clears the hover-only new-thread button when no count holds its place.
+            className={cn(!showsCount && "group-hover/project-folder:mr-6 pointer-coarse:mr-6")}
+          />
+        ) : null}
         {dot ? (
           <span className={cn("size-1.5 shrink-0 rounded-full", FOLDER_DOT_CLASS_NAME[dot])}>
             <span className="sr-only">{FOLDER_DOT_LABEL[dot]}</span>
           </span>
         ) : null}
-        {collapsed && hiddenThreads.length > 0 ? (
+        {showsCount ? (
           <span className="shrink-0 text-xs tabular-nums text-sidebar-muted-foreground group-hover/project-folder:invisible pointer-coarse:invisible">
             {hiddenThreads.length}
           </span>

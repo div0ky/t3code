@@ -59,9 +59,10 @@ and worktree while you stay in the new thread composer. This requires a Git proj
 
 ## Flag urgent threads
 
-Choose **Mark urgent** from a thread's menu to make it stand out in the sidebar. A
-closed folder shows a red dot when it holds an urgent thread. **Clear urgent** removes
-the flag. Archiving also removes it, and unarchiving does not bring it back. Urgent threads
+Choose **Mark urgent** from a thread's menu to move it to the **Urgent** section at the top
+of the sidebar, above global pins. A folder shows a red badge counting its urgent threads.
+Snoozed and settled threads stay on their shelves. **Clear urgent** removes the flag and
+returns the thread to its place. Archiving also removes it, and unarchiving does not bring it back. Urgent threads
 are not auto-settled.
 
 ## Pin and reorder threads

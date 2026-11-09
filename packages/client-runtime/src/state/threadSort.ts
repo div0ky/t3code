@@ -265,6 +265,15 @@ export function planPinnedReorder(input: {
   });
 }
 
+/** Most recently flagged first. */
+export function sortUrgentThreads<T extends { readonly urgentAt?: string | null }>(
+  threads: readonly T[],
+): T[] {
+  return [...threads].sort((left, right) =>
+    (right.urgentAt ?? "").localeCompare(left.urgentAt ?? ""),
+  );
+}
+
 export function sortPinnedThreadsByOrderKey<
   T extends {
     readonly id: string;

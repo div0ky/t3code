@@ -21,6 +21,7 @@ import {
   shouldRecedeSidebarThread,
   sortInboxThreadsByReturn,
   resolveSidebarDropTarget,
+  resolveSidebarThreadSection,
   planSidebarThreadDrop,
   resolveSidebarReorderableThreadKeys,
   sortPinnedThreadsForSidebar,
@@ -1102,6 +1103,22 @@ describe("Working shelf (beta)", () => {
       row("s1", "settled"),
     ];
 
+    it("keeps drops out of the Urgent section and its rows out of the pin order", () => {
+      const withUrgent = [marker("urgent-header"), row("u1", "urgent"), ...items];
+      expect(resolveSidebarDropTarget(withUrgent, "a1", "u1")).toBeNull();
+      expect(resolveSidebarDropTarget(withUrgent, "a1", "p1")).toMatchObject({
+        section: "pinned",
+        pinnedOrder: ["a1", "p1"],
+        activeOrder: ["a2"],
+      });
+      expect(
+        resolveSidebarThreadSection({ snoozed: false, settled: false, urgent: true, pinned: true }),
+      ).toBe("urgent");
+      expect(
+        resolveSidebarThreadSection({ snoozed: false, settled: true, urgent: true, pinned: false }),
+      ).toBe("settled");
+    });
+
     it("never drops into the Working shelf, and keeps it out of the inbox order", () => {
       expect(resolveSidebarDropTarget(items, "a1", "w1")).toBeNull();
       expect(resolveSidebarDropTarget(items, "p1", "a2")).toMatchObject({
@@ -1634,9 +1651,6 @@ describe("resolveSidebarFolderDot", () => {
     };
 
     expect(resolveSidebarFolderDot([idle])).toBeNull();
-    expect(
-      resolveSidebarFolderDot([limited, { ...idle, urgentAt: "2026-03-09T10:05:00.000Z" }]),
-    ).toBe("urgent");
     // A waiting thread stays quiet even with an unread completion, like its row.
     expect(
       resolveSidebarFolderDot([{ ...unread, runtime: { ...runtime, status: "idle" as const } }]),

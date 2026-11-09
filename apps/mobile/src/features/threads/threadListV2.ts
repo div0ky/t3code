@@ -28,6 +28,7 @@ import {
   resolveThreadActivityTimestamp,
   sortPinnedThreadsByOrderKey,
   sortSettledThreads,
+  sortUrgentThreads,
 } from "@t3tools/client-runtime/state/thread-sort";
 import { isListedThreadLineage, type EnvironmentId, type ProjectId } from "@t3tools/contracts";
 import type { SnoozePresetSetting } from "@t3tools/contracts/settings";
@@ -338,6 +339,8 @@ export function getThreadListV2OrderedSection(input: {
     ) {
       return false;
     }
+    // Urgent rows sit in their own block, sorted by flag time.
+    if (thread.urgentAt != null) return false;
     return (thread.pinnedAt != null) === (input.section === "pinned");
   });
   const ordered =
@@ -695,6 +698,7 @@ export function buildThreadListV2Items(input: {
     : null;
 
   const workingShelfEnabled = input.workingShelfEnabled === true;
+  const urgent: EnvironmentThreadShell[] = [];
   const pinned: EnvironmentThreadShell[] = [];
   const active: EnvironmentThreadShell[] = [];
   const working: EnvironmentThreadShell[] = [];
@@ -750,6 +754,8 @@ export function buildThreadListV2Items(input: {
       queuedThreadKeys?.has(`${thread.environmentId}:${thread.id}`) === true;
     if (supportsSettlement && thread.settledOverride === "settled" && !hasQueuedMessages) {
       settled.push(thread);
+    } else if (thread.urgentAt != null) {
+      urgent.push(thread);
     } else if (thread.pinnedAt != null) {
       pinned.push(thread);
     } else if (workingShelfEnabled && (input.isWorking ?? isThreadWorking)(thread)) {
@@ -765,7 +771,6 @@ export function buildThreadListV2Items(input: {
     // server's order. Each row keeps its shelf's look.
     const slim = new Set([...snoozed, ...settled]);
     const snoozedThreads = new Set(snoozed);
-    const pinnedThreads = new Set(pinned);
     const threadByKey = new Map(
       listedThreads.map((thread) => [
         threadSearchMatchKey({ environmentId: thread.environmentId, threadId: thread.id }),
@@ -782,7 +787,7 @@ export function buildThreadListV2Items(input: {
         thread,
         variant: slim.has(thread) ? "slim" : "card",
         snoozed: snoozedThreads.has(thread),
-        pinned: pinnedThreads.has(thread),
+        pinned: !slim.has(thread) && thread.pinnedAt != null,
         wokeAt: slim.has(thread) ? null : resolveThreadListV2WokeAt(thread, { now }),
         isLast: index === results.length - 1,
       })),
@@ -846,6 +851,16 @@ export function buildThreadListV2Items(input: {
         );
 
   const items: ThreadListV2Item[] = [];
+  for (const thread of sortUrgentThreads(urgent)) {
+    items.push({
+      thread,
+      variant: "card",
+      snoozed: false,
+      pinned: thread.pinnedAt != null,
+      wokeAt: resolveThreadListV2WokeAt(thread, { now }),
+      isLast: false,
+    });
+  }
   for (const thread of applyPendingThreadOrder(
     sortPinnedThreadsByOrderKey(pinned),
     "pinned",

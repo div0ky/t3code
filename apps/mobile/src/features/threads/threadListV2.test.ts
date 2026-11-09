@@ -358,6 +358,47 @@ describe("buildThreadListV2Items", () => {
     expect(layout.snoozedCount).toBe(1);
   });
 
+  it("lists urgent threads above pins, newest flag first, and out of the pin order", () => {
+    const threads = [
+      makeThread({
+        id: ThreadId.make("pinned"),
+        title: "Pinned",
+        pinnedAt: "2026-06-01T12:00:00.000Z",
+      }),
+      makeThread({ id: ThreadId.make("active"), title: "Active" }),
+      makeThread({
+        id: ThreadId.make("older"),
+        title: "Older",
+        urgentAt: "2026-06-01T10:00:00.000Z",
+      }),
+      makeThread({
+        id: ThreadId.make("newer-pinned"),
+        title: "Newer pinned",
+        urgentAt: "2026-06-01T11:00:00.000Z",
+        pinnedAt: "2026-06-01T09:00:00.000Z",
+      }),
+    ];
+    const { items } = buildThreadListV2Items({
+      threads,
+      environmentId: null,
+      searchQuery: "",
+      now: NOW,
+    });
+
+    expect(items.map((item) => item.thread.id)).toEqual([
+      "newer-pinned",
+      "older",
+      "pinned",
+      "active",
+    ]);
+    expect(items[0]?.pinned).toBe(true);
+    expect(
+      getThreadListV2OrderedSection({ threads, section: "pinned", now: NOW }).map(
+        (thread) => thread.id,
+      ),
+    ).toEqual(["pinned"]);
+  });
+
   it("moves a settled pinned thread into the settled shelf — parity with web (#7969)", () => {
     const layout = buildThreadListV2Items({
       threads: [

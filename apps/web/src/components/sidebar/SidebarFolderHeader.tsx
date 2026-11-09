@@ -11,10 +11,9 @@ import {
   resolveThreadLastVisitedAt,
   sidebarFolderMarker,
 } from "../Sidebar.logic";
-import { SortableSidebarMarker } from "./SidebarListMarkers";
+import { SidebarUrgentCountBadge, SortableSidebarMarker } from "./SidebarListMarkers";
 
 const DOT_CLASS_NAME = {
-  urgent: "bg-error",
   attention: "bg-warning",
   failed: "bg-error",
   unread: "bg-success",
@@ -56,6 +55,7 @@ function FolderNameInput(props: {
 export const SidebarFolderHeader = memo(function SidebarFolderHeader(props: {
   folder: SidebarFolder;
   threadCount: number;
+  urgentCount: number;
   hiddenThreads: readonly EnvironmentThreadShell[];
   isDropTarget: boolean;
   isRenaming: boolean;
@@ -106,6 +106,7 @@ export const SidebarFolderHeader = memo(function SidebarFolderHeader(props: {
           {folder.name}
         </span>
       )}
+      {props.urgentCount > 0 ? <SidebarUrgentCountBadge count={props.urgentCount} /> : null}
       {dot ? <span className={cn("size-1.5 shrink-0 rounded-full", DOT_CLASS_NAME[dot])} /> : null}
       <span className="shrink-0 text-xs tabular-nums text-sidebar-muted-foreground">
         {props.threadCount}
