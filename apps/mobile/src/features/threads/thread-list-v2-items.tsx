@@ -661,11 +661,13 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
   ) => void;
   readonly onUnpinThread: (thread: EnvironmentThreadShell) => void;
   readonly onSetThreadAutoSettle: (thread: EnvironmentThreadShell, enabled: boolean) => void;
+  readonly onSetThreadUrgent: (thread: EnvironmentThreadShell, urgent: boolean) => void;
   readonly settlementSupported: boolean;
   readonly snoozeSupported: boolean;
   readonly snoozePresets: ReadonlyArray<SnoozePresetSetting> | undefined;
   readonly pinningSupported: boolean;
   readonly autoSettleOptOutSupported: boolean;
+  readonly urgentFlagSupported: boolean;
   readonly titleRegenerationSupported: boolean;
   readonly reorderSupported?: boolean;
   readonly onMoveThread?: (
@@ -709,6 +711,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
     onPinThread,
     onUnpinThread,
     onSetThreadAutoSettle,
+    onSetThreadUrgent,
     onMoveThread,
   } = props;
   const snoozedRow = props.snoozed === true;
@@ -876,6 +879,18 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
         : [],
     [props.pinningSupported, thread.pinnedAt, thread.globallyPinned],
   );
+  const isUrgent = thread.urgentAt != null;
+  const urgentMenuItems = useMemo<MenuAction[]>(
+    () =>
+      props.urgentFlagSupported
+        ? [
+            isUrgent
+              ? { id: "unurgent", title: "Clear urgent", image: "flame" }
+              : { id: "urgent", title: "Mark urgent", image: "flame" },
+          ]
+        : [],
+    [props.urgentFlagSupported, isUrgent],
+  );
   const autoSettleMenuItems = useMemo<MenuAction[]>(
     () =>
       props.autoSettleOptOutSupported
@@ -945,6 +960,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
         pin: [],
         secondary: [
           ...titleMenuItems,
+          ...urgentMenuItems,
           ...autoSettleMenuItems,
           LEGACY_MENU_ACTIONS[0]!,
           SNOOZED_MENU_ACTIONS[1]!,
@@ -970,6 +986,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
         pin: pinMenuItems,
         secondary: [
           ...titleMenuItems,
+          ...urgentMenuItems,
           ...autoSettleMenuItems,
           LEGACY_MENU_ACTIONS[0]!,
           SLIM_MENU_ACTIONS[1]!,
@@ -989,6 +1006,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
       pin: pinMenuItems,
       secondary: [
         ...titleMenuItems,
+        ...urgentMenuItems,
         ...autoSettleMenuItems,
         LEGACY_MENU_ACTIONS[0]!,
         CARD_MENU_ACTIONS[1]!,
@@ -996,6 +1014,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
     });
   }, [
     autoSettleMenuItems,
+    urgentMenuItems,
     canUnsettle,
     pinMenuItems,
     props.settlementSupported,
@@ -1015,6 +1034,8 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
       if (nativeEvent.event === "pin") handlePin();
       if (nativeEvent.event === "global-pin") handleGlobalPin();
       if (nativeEvent.event === "unpin") handleUnpin();
+      if (nativeEvent.event === "urgent") onSetThreadUrgent(thread, true);
+      if (nativeEvent.event === "unurgent") onSetThreadUrgent(thread, false);
       if (nativeEvent.event === "auto-settle:enabled") handleSetAutoSettle(true);
       if (nativeEvent.event === "auto-settle:disabled") handleSetAutoSettle(false);
       if (nativeEvent.event === "arrange") appAtomRegistry.set(threadArrangementOpenAtom, true);
@@ -1070,6 +1091,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
       handleSettle,
       handleSnooze,
       handleSetAutoSettle,
+      onSetThreadUrgent,
       handleUnpin,
       handleUnsettle,
       handleUnsnooze,
@@ -1143,6 +1165,16 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
   const cardContent = (
     <>
       <View className="flex-row items-start gap-2">
+        {thread.urgentAt != null ? (
+          <View className="justify-center" style={{ height: titleLineHeight }}>
+            <SymbolView
+              name="flame"
+              size={12}
+              tintColorClassName="accent-danger-foreground"
+              type="monochrome"
+            />
+          </View>
+        ) : null}
         {props.project ? (
           <View className="justify-center" style={{ height: titleLineHeight }}>
             <ProjectFavicon
@@ -1385,6 +1417,24 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
     cardContent
   );
 
+  const urgentBackdrop = isUrgent ? (
+    <>
+      <View pointerEvents="none" className="absolute inset-0 bg-danger" />
+      <View
+        pointerEvents="none"
+        className="absolute bottom-1 left-0 top-1 w-0.5 bg-danger-foreground"
+      />
+    </>
+  ) : null;
+  const urgentIcon = isUrgent ? (
+    <SymbolView
+      name="flame"
+      size={12}
+      tintColorClassName="accent-danger-foreground"
+      type="monochrome"
+    />
+  ) : null;
+
   const rowContent = (close: () => void) =>
     variant === "card" ? (
       <RowPressable
@@ -1407,6 +1457,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
         }}
         style={rowAppearance.cardStyle}
       >
+        {urgentBackdrop}
         {sidebarPane ? (
           fadedCardContent
         ) : (
@@ -1434,6 +1485,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
         }}
         style={rowAppearance.style}
       >
+        {urgentBackdrop}
         <View
           className={cn(
             THREAD_LIST_V2_ROW_CONTENT_CLASS_NAME,
@@ -1441,6 +1493,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
             sidebarPane && "px-3",
           )}
         >
+          {urgentIcon}
           {props.project ? (
             <View className="opacity-40">
               <ProjectFavicon

@@ -132,6 +132,7 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
     pinThread,
     unpinThread,
     setThreadAutoSettle,
+    setThreadUrgent,
     moveThread,
     renameThread,
     regenerateThreadTitle,
@@ -253,6 +254,7 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
     snoozePresetsByEnvironmentId,
     pinningEnvironmentIds,
     autoSettleOptOutEnvironmentIds,
+    urgentFlagEnvironmentIds,
     pinReorderEnvironmentIds,
     activeReorderEnvironmentIds,
     titleRegenerationEnvironmentIds,
@@ -459,6 +461,7 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
             snoozePresets={snoozePresetsByEnvironmentId.get(thread.environmentId)}
             pinningSupported={pinningEnvironmentIds.has(thread.environmentId)}
             autoSettleOptOutSupported={autoSettleOptOutEnvironmentIds.has(thread.environmentId)}
+            urgentFlagSupported={urgentFlagEnvironmentIds.has(thread.environmentId)}
             reorderSupported={
               item.item.pinned
                 ? pinReorderEnvironmentIds.has(thread.environmentId)
@@ -472,6 +475,7 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
             onPinThread={pinThread}
             onUnpinThread={unpinThread}
             onSetThreadAutoSettle={setThreadAutoSettle}
+            onSetThreadUrgent={setThreadUrgent}
             onMoveThread={moveThread}
             onSwipeableClose={handleSwipeableClose}
             onSwipeableWillOpen={handleSwipeableWillOpen}

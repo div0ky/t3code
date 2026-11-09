@@ -182,6 +182,7 @@ export interface EnvironmentThreadShell {
   readonly pinnedAt: string | null;
   readonly globallyPinned?: boolean;
   readonly autoSettleDisabledAt?: string | null;
+  readonly urgentAt?: string | null;
   readonly pinOrderKey: string | null;
   readonly activeOrderKey: string | null;
   readonly pullRequests: ReadonlyArray<import("@t3tools/contracts").ThreadPullRequestLink>;
@@ -338,6 +339,7 @@ export function presentThreadShell(
     pinnedAt: nullableIso(thread.pinnedAt ?? null),
     globallyPinned: thread.globallyPinned ?? false,
     autoSettleDisabledAt: nullableIso(thread.autoSettleDisabledAt ?? null),
+    urgentAt: nullableIso(thread.urgentAt ?? null),
     pinOrderKey: thread.pinOrderKey ?? null,
     activeOrderKey: thread.activeOrderKey ?? null,
     ...(thread.lastVisitedAt === undefined

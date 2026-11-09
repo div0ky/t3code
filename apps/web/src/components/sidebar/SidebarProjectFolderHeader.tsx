@@ -12,6 +12,7 @@ import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
 const FOLDER_DOT_CLASS_NAME = {
+  urgent: "bg-error",
   attention: "bg-warning",
   failed: "bg-error",
   unread: "bg-success",
@@ -19,6 +20,7 @@ const FOLDER_DOT_CLASS_NAME = {
 } as const;
 
 const FOLDER_DOT_LABEL = {
+  urgent: ", urgent",
   attention: ", needs you",
   failed: ", failed",
   unread: ", done",

@@ -46,6 +46,7 @@ import {
   FolderIcon,
   GitBranchIcon,
   MessageCircleQuestionIcon,
+  FlameIcon,
   PinIcon,
   PinOffIcon,
   ShieldQuestionIcon,
@@ -438,6 +439,8 @@ type SortableThreadRowBag = Pick<
 >;
 
 export const draftSurfaceClassName = "bg-warning/4 hover:bg-warning/8";
+const urgentEdgeClassName =
+  "before:absolute before:inset-y-1 before:left-0 before:w-0.5 before:rounded-full before:bg-destructive";
 export const draftPenClassName = "size-3 shrink-0 text-warning-foreground";
 
 // useSortable memoizes on its `disabled` object, so a fresh one per render
@@ -962,6 +965,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     }
   };
 
+  const isUrgent = thread.urgentAt != null;
   const rowSurfaceClassName = cn(
     "group/sidebar-row relative w-full cursor-pointer overflow-hidden rounded-md text-left outline-none select-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
     variantAction === "unsettle" &&
@@ -979,6 +983,13 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     shouldRecede &&
       (status === "preparing" || status === "working") &&
       "opacity-70 transition-opacity hover:opacity-100 focus-within:opacity-100 motion-reduce:transition-none",
+    isUrgent &&
+      cn(
+        urgentEdgeClassName,
+        props.isActive || isSelected
+          ? "bg-destructive/24"
+          : "bg-destructive/9 hover:bg-destructive/14",
+      ),
     isFileDragOver && "ring-1 ring-inset ring-primary/70",
     isFileDragOver && !props.isActive && !isSelected && "bg-sidebar-row-hover",
     props.sortable?.isDragging &&
@@ -1091,6 +1102,9 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
       onThreadActivate={onThreadActivate}
     />
   );
+  const urgentIndicator = isUrgent ? (
+    <FlameIcon role="img" aria-label="Urgent" className="size-3 shrink-0 text-destructive" />
+  ) : null;
   const draftIndicator = hasUnsentDraft ? (
     <Tooltip>
       <TooltipTrigger
@@ -1266,6 +1280,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                   ) : null}
                 </span>
               )}
+              {urgentIndicator}
               {draftIndicator}
               {title}
               {multiline ? titleLineIcons : null}
@@ -1447,6 +1462,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
             )}
           >
             <div className="flex h-5 min-w-0 items-center gap-1.5">
+              {urgentIndicator}
               {draftIndicator}
               {props.project ? (
                 <ProjectFavicon project={props.project} className="size-4 shrink-0" />

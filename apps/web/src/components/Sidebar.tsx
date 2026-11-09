@@ -965,6 +965,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     unpinThread,
     confirmAndUnpinThread,
     setThreadAutoSettle,
+    setThreadUrgent,
     turnThreadIntoProject,
     reorderPinnedThread,
     reorderActiveThread,
@@ -2805,6 +2806,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 isGloballyPinned: thread.globallyPinned === true,
                 isSettled,
                 autoSettleEnabled: thread.autoSettleDisabledAt == null,
+                isUrgent: thread.urgentAt != null,
                 isSnoozed,
                 canSnoozeNow: canSnooze(thread, { now: new Date().toISOString() }),
                 isRegeneratingTitle,
@@ -2816,6 +2818,9 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 supports: {
                   settlement: configLoaded,
                   autoSettleOptOut: supportsAutoSettleOptOut,
+                  urgent:
+                    serverConfigs.get(thread.environmentId)?.environment.capabilities
+                      .threadUrgentFlag === true,
                   snooze: configLoaded,
                   pinning: configLoaded,
                   titleRegeneration: configLoaded,
@@ -2944,6 +2949,21 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 stackedThreadToast({
                   type: "error",
                   title: "Could not turn thread into a project",
+                  description: error instanceof Error ? error.message : "An error occurred.",
+                }),
+              );
+            }
+            return;
+          }
+          case "urgent":
+          case "unurgent": {
+            const result = await setThreadUrgent(threadRef, clicked.value === "urgent");
+            if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
+              const error = squashAtomCommandFailure(result);
+              toastManager.add(
+                stackedThreadToast({
+                  type: "error",
+                  title: "Failed to update urgent flag",
                   description: error instanceof Error ? error.message : "An error occurred.",
                 }),
               );

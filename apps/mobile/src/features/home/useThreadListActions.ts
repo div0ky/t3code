@@ -202,6 +202,7 @@ export function useThreadListActions(): {
     globallyPinned?: boolean,
   ) => Promise<boolean>;
   readonly unpinThread: (thread: EnvironmentThreadShell) => Promise<boolean>;
+  readonly setThreadUrgent: (thread: EnvironmentThreadShell, urgent: boolean) => Promise<boolean>;
   readonly setThreadAutoSettle: (
     thread: EnvironmentThreadShell,
     enabled: boolean,
@@ -218,6 +219,9 @@ export function useThreadListActions(): {
   const unsnoozeMutation = useAtomCommand(threadEnvironment.unsnooze, { reportFailure: false });
   const pinMutation = useAtomCommand(threadEnvironment.pin, { reportFailure: false });
   const unpinMutation = useAtomCommand(threadEnvironment.unpin, { reportFailure: false });
+  const setUrgentMutation = useAtomCommand(threadEnvironment.setUrgent, {
+    reportFailure: false,
+  });
   const setAutoSettleMutation = useAtomCommand(threadEnvironment.setAutoSettle, {
     reportFailure: false,
   });
@@ -487,6 +491,24 @@ export function useThreadListActions(): {
     offerUndo(thread, "Unpinned", claim, plan);
     return true;
   };
+  const setThreadUrgent = async (thread: EnvironmentThreadShell, urgent: boolean) => {
+    selectionHaptic();
+    const result = await setUrgentMutation({
+      environmentId: thread.environmentId,
+      input: { threadId: thread.id, urgent },
+    });
+    if (result._tag === "Failure") {
+      const error = Cause.squash(result.cause);
+      Dialog.alert(
+        "Could not update urgent flag",
+        error instanceof Error && error.message.trim().length > 0
+          ? error.message
+          : "The urgent flag could not be changed.",
+      );
+      return false;
+    }
+    return true;
+  };
   const setThreadAutoSettle = async (thread: EnvironmentThreadShell, enabled: boolean) => {
     if (!environmentSupportsAutoSettleOptOut(thread.environmentId)) {
       Dialog.alert(
@@ -736,6 +758,7 @@ export function useThreadListActions(): {
     pinThread,
     unpinThread,
     setThreadAutoSettle,
+    setThreadUrgent,
     moveThread,
     renameThread,
     regenerateThreadTitle,
