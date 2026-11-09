@@ -694,7 +694,7 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
   for (const thread of visible) {
     const configLoaded = serverConfigs.has(thread.environmentId);
     const threadKey = scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id));
-    if (optimisticDrop?.key === threadKey && thread.urgentAt == null) {
+    if (optimisticDrop?.key === threadKey) {
       const dropped = applySidebarThreadDrop(
         thread,
         optimisticDrop.section,
@@ -702,11 +702,13 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
         optimisticDrop.assignedKeys.get(threadKey),
       );
       const projected = { ...dropped, globallyPinned: optimisticDrop.section === "pinned" };
-      (optimisticDrop.section === "pinned"
-        ? pinned
-        : optimisticDrop.section === "settled"
-          ? settled
-          : inbox(projected, true)
+      (optimisticDrop.section === "settled"
+        ? settled
+        : thread.urgentAt != null
+          ? urgent
+          : optimisticDrop.section === "pinned"
+            ? pinned
+            : inbox(projected, true)
       ).push(
         optimisticDrop.clearsSnooze
           ? projected
