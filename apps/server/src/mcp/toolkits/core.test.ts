@@ -77,6 +77,7 @@ const decodeMcpAttachmentInput = Schema.decodeUnknownEffect(McpAttachmentInput);
 const decodeThreadReadResult = Schema.decodeUnknownEffect(OrchestratorMcpThreadReadResult);
 
 const layerThreadToolkit = McpHttpServer.layerThreadToolkit.pipe(
+  Layer.provide(ServerSettings.layerTest()),
   Layer.provide(Layer.mock(ThreadSearch.ThreadSearch)({})),
   Layer.provide(Layer.mock(ScheduledTaskService.ScheduledTaskService)({})),
   Layer.provide(Layer.mock(PeerForwarding.PeerForwarding)({})),
@@ -558,6 +559,78 @@ it.effect("a client caller targets any thread within its ceiling and cannot act 
   ),
 );
 
+it.effect("organizes folders, keeps concurrent moves, and rejects unknown folders", () =>
+  Effect.gen(function* () {
+    const server = yield* McpServer.McpServer;
+    const call = (name: string, args: Record<string, unknown>) =>
+      server
+        .callTool({ name, arguments: args })
+        .pipe(
+          Effect.provideService(
+            McpInvocationContext.McpInvocationContext,
+            clientScope("full-access"),
+          ),
+          Effect.provideService(McpSchema.McpServerClient, client),
+        );
+    const list = () =>
+      call("t3_folder_list", {}).pipe(
+        Effect.map(
+          (result) =>
+            (result.structuredContent as { folders: ReadonlyArray<Record<string, unknown>> })
+              .folders,
+        ),
+      );
+
+    yield* call("t3_folder_organize", { action: "create", name: "Work" });
+    const folderId = (yield* list())[0]?.id;
+
+    yield* Effect.forEach(
+      ["a", "b", "c"],
+      (id) => call("t3_folder_organize", { action: "move_threads", folderId, threadIds: [id] }),
+      { concurrency: "unbounded" },
+    );
+    const filed = (yield* list())[0]?.threadIds;
+    expect(filed).toHaveLength(3);
+    expect(filed).toEqual(expect.arrayContaining(["a", "b", "c"]));
+
+    yield* call("t3_folder_organize", { action: "rename", folderId, name: "Shipping" });
+    yield* call("t3_folder_organize", { action: "remove_threads", threadIds: ["b"] });
+    expect((yield* list())[0]).toMatchObject({ name: "Shipping" });
+    expect((yield* list())[0]?.threadIds).not.toContain("b");
+
+    expect(
+      declaredFailure(
+        yield* call("t3_folder_organize", {
+          action: "move_threads",
+          folderId: "gone",
+          threadIds: ["a"],
+        }),
+      ),
+    ).toMatchObject({ code: "invalid_request" });
+    expect(declaredFailure(yield* call("t3_folder_organize", { action: "create" }))).toMatchObject({
+      code: "invalid_request",
+    });
+
+    yield* call("t3_folder_organize", { action: "delete", folderId });
+    expect(yield* list()).toEqual([]);
+  }).pipe(
+    Effect.provide(
+      layerThreadToolkit.pipe(
+        Layer.provideMerge(McpHttpServer.layerInProcessMcpServer),
+        Layer.provide(NodeCrypto.layer),
+        Layer.provide(
+          Layer.mock(ThreadManagement.ThreadManagementService)({
+            getThreadShell: (id) =>
+              Effect.succeed(McpToolAccessTestkit.liveThreadShell(id, { runtimeMode: "auto" })),
+            getProjectThreadRecords: ({ threadId }) =>
+              Effect.succeed({ thread: { id: threadId } } as never),
+          }),
+        ),
+      ),
+    ),
+  ),
+);
+
 it.effect("a read-only client reads threads and is refused every write before it runs", () =>
   Effect.gen(function* () {
     const server = yield* McpServer.McpServer;
@@ -583,6 +656,8 @@ it.effect("a read-only client reads threads and is refused every write before it
       threadId: "other-project-thread",
     });
     expect(declaredFailure(pinned)).toMatchObject({ code: "capability_denied" });
+    const folder = yield* call("t3_folder_organize", { action: "create", name: "Work" });
+    expect(declaredFailure(folder)).toMatchObject({ code: "capability_denied" });
     expect(dispatched).toEqual([]);
 
     const configure = yield* call("t3_thread_configure", {
@@ -768,6 +843,7 @@ it.effect.each([
       McpHttpServer.layerThreadToolkit.pipe(
         Layer.provideMerge(McpHttpServer.layerInProcessMcpServer),
         Layer.provide(NodeCrypto.layer),
+        Layer.provide(ServerSettings.layerTest()),
         Layer.provide(Layer.mock(ThreadManagement.ThreadManagementService)({})),
         Layer.provide(Layer.mock(ThreadSearch.ThreadSearch)({})),
         Layer.provide(Layer.mock(PeerForwarding.PeerForwarding)({})),

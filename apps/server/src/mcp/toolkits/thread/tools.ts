@@ -19,6 +19,7 @@ import {
   RunId,
   NonNegativeInt,
   ProjectId,
+  SidebarFolder,
 } from "@t3tools/contracts";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Schema from "effect/Schema";
@@ -26,6 +27,7 @@ import { Tool, Toolkit } from "effect/ai";
 
 import * as ThreadSearch from "../../../orchestration-v2/ThreadSearch.ts";
 import * as ScheduledTaskService from "../../../scheduledTasks/ScheduledTaskService.ts";
+import * as ServerSettings from "../../../serverSettings.ts";
 import * as ThreadManagementService from "../../../orchestration-v2/ThreadManagementService.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
 
@@ -61,6 +63,45 @@ const ThreadOrganizeTool = Tool.make("t3_thread_organize", {
   ],
 })
   .annotate(Tool.Title, "Organize a thread")
+  .annotate(Tool.Strict, true)
+  .annotate(Tool.Destructive, true);
+
+const FolderListResult = Schema.Struct({ folders: Schema.Array(SidebarFolder) });
+
+const FolderListTool = Tool.make("t3_folder_list", {
+  description:
+    "List this environment's sidebar folders and the threads in each. Use a folder's `id` with `t3_folder_organize`.",
+  parameters: Schema.Struct({ environmentId: OrchestratorMcpEnvironmentTarget }),
+  success: FolderListResult,
+  failure: OrchestratorMcpFailure,
+  failureMode: "return" as const,
+  dependencies: [ServerSettings.ServerSettingsService],
+})
+  .annotate(Tool.Title, "List thread folders")
+  .annotate(Tool.Readonly, true)
+  .annotate(Tool.Destructive, false);
+
+const FolderOrganizeTool = Tool.make("t3_folder_organize", {
+  description:
+    "Create, rename, or delete a sidebar folder, or file threads in one. `create` needs `name`. `rename` needs `folderId` and `name`. `delete` needs `folderId` and keeps its threads. `move_threads` needs `folderId`. `remove_threads` takes threads out of their folder. Omit `threadIds` for this thread. A thread can only join a folder in its own environment.",
+  parameters: Schema.Struct({
+    environmentId: OrchestratorMcpEnvironmentTarget,
+    action: Schema.Literals(["create", "rename", "delete", "move_threads", "remove_threads"]),
+    folderId: Schema.optional(TrimmedNonEmptyString),
+    name: Schema.optional(TrimmedNonEmptyString),
+    threadIds: Schema.optional(Schema.Array(ThreadId)),
+  }),
+  success: FolderListResult,
+  failure: OrchestratorMcpFailure,
+  failureMode: "return" as const,
+  dependencies: [
+    McpInvocationContext.McpInvocationContext,
+    ThreadManagementService.ThreadManagementService,
+    ServerSettings.ServerSettingsService,
+    SecureRandom.SecureRandom,
+  ],
+})
+  .annotate(Tool.Title, "Organize thread folders")
   .annotate(Tool.Strict, true)
   .annotate(Tool.Destructive, true);
 
@@ -243,6 +284,8 @@ export const ThreadToolkit = Toolkit.make(
   ThreadConfigureTool,
   ThreadTransferTool,
   ThreadOrganizeTool,
+  FolderListTool,
+  FolderOrganizeTool,
   PendingRequestTool,
   QueueTool,
 );

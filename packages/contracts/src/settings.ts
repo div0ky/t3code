@@ -1224,7 +1224,72 @@ export const StorageCleanupSettings = Schema.Struct({
 });
 export type StorageCleanupSettings = typeof StorageCleanupSettings.Type;
 
+export const SidebarFolder = Schema.Struct({
+  id: TrimmedNonEmptyString,
+  name: TrimmedNonEmptyString,
+  threadIds: Schema.Array(ThreadId),
+});
+export type SidebarFolder = typeof SidebarFolder.Type;
+
+export const SidebarFolderOperation = Schema.Union([
+  Schema.Struct({
+    action: Schema.Literal("create"),
+    folderId: TrimmedNonEmptyString,
+    name: TrimmedNonEmptyString,
+  }),
+  Schema.Struct({
+    action: Schema.Literal("rename"),
+    folderId: TrimmedNonEmptyString,
+    name: TrimmedNonEmptyString,
+  }),
+  Schema.Struct({ action: Schema.Literal("delete"), folderId: TrimmedNonEmptyString }),
+  Schema.Struct({
+    action: Schema.Literal("move_threads"),
+    threadIds: Schema.Array(ThreadId),
+    // Null takes the threads out of every folder.
+    folderId: Schema.NullOr(TrimmedNonEmptyString),
+  }),
+]);
+export type SidebarFolderOperation = typeof SidebarFolderOperation.Type;
+
+// ponytail: deleting a thread leaves its id in its folder; prune on thread deletion if files grow.
+export function applySidebarFolderOperation(
+  folders: ReadonlyArray<SidebarFolder>,
+  operation: SidebarFolderOperation,
+): ReadonlyArray<SidebarFolder> {
+  switch (operation.action) {
+    case "create":
+      // Idempotent so a retried import cannot duplicate a folder.
+      return folders.some((folder) => folder.id === operation.folderId)
+        ? folders
+        : [...folders, { id: operation.folderId, name: operation.name, threadIds: [] }];
+    case "rename":
+      return folders.map((folder) =>
+        folder.id === operation.folderId ? { ...folder, name: operation.name } : folder,
+      );
+    case "delete":
+      return folders.filter((folder) => folder.id !== operation.folderId);
+    case "move_threads": {
+      if (
+        operation.folderId !== null &&
+        !folders.some((folder) => folder.id === operation.folderId)
+      ) {
+        return folders;
+      }
+      const moved = new Set(operation.threadIds);
+      return folders.map((folder) => {
+        const kept = folder.threadIds.filter((threadId) => !moved.has(threadId));
+        return {
+          ...folder,
+          threadIds: folder.id === operation.folderId ? [...kept, ...moved] : kept,
+        };
+      });
+    }
+  }
+}
+
 export const ServerSettings = Schema.Struct({
+  sidebarFolders: Schema.Array(SidebarFolder).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
   // Null means unmigrated; empty is authoritative and must not resurrect cleared preferences.
   favorites: Schema.NullOr(ModelFavorites).pipe(Schema.withDecodingDefault(Effect.succeed(null))),
   providerModelPreferences: Schema.NullOr(ProviderModelPreferences).pipe(
