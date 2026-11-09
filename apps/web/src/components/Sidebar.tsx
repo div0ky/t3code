@@ -810,7 +810,10 @@ function isOptimisticDropReleased(input: {
   }
   if (canonicalSection !== optimisticDrop.section) return false;
   if (optimisticDrop.clearsSnooze && thread.snoozedUntil != null) return false;
-  const destinationKeys = optimisticDrop.section === "pinned" ? pinnedKeys : activeKeys;
+  const destinationKeys =
+    optimisticDrop.section === "pinned"
+      ? pinnedKeys
+      : activeKeys.filter((key) => canonicalByKey.get(key)?.pinnedAt == null);
   const canonicalDestination = destinationKeys.flatMap((key) => {
     const canonical = canonicalByKey.get(key);
     return canonical === undefined ? [] : [canonical];
@@ -2169,6 +2172,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       .filter((thread) => thread.pinnedAt != null)
       .map((thread) => [threadShellKey(thread), thread.pinOrderKey]),
   );
+  const folderPinKeys = new Set(folderPinKeysById.keys());
+  const reorderableActiveKeys = activeKeys.filter((key) => !folderPinKeys.has(key));
   const planThreadDrop = (
     activeKey: string,
     activeSection: SidebarSection,
@@ -2176,7 +2181,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     target: SidebarDropTarget,
   ) => {
     const folderPinned =
-      thread.pinnedAt != null && !thread.globallyPinned && target.section === "active";
+      activeSection === "active" &&
+      thread.pinnedAt != null &&
+      !thread.globallyPinned &&
+      target.section === "active";
     const folderIds = useSidebarFoldersStore.getState().folderIdByThreadKey;
     return planSidebarThreadDrop({
       activeKey,
@@ -2190,7 +2198,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             ...target,
             activeOrder: target.activeSlots.length ? target.folderSiblings : target.activeOrder,
           }
-        : resolveFolderDropOrder(target, activeKeys, activeKey),
+        : resolveFolderDropOrder(target, activeKeys, activeKey, folderPinKeys),
       pinnedOrder: folderPinned
         ? activeKeys.filter(
             (key) => folderPinKeysById.has(key) && (folderIds[key] ?? null) === target.folderId,
@@ -2198,10 +2206,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         : pinnedKeys,
       pinnedKeysById: folderPinned ? folderPinKeysById : pinnedKeysById,
       reorderableKeys: draggableThreadKeys,
-      activeOrder: activeKeys,
+      activeOrder: reorderableActiveKeys,
       activeKeysById,
       activeReorderableKeys: activeReorderableThreadKeys,
-      activeTimeOrdered: workingShelfEnabled,
+      activeTimeOrdered: workingShelfEnabled || (thread.pinnedAt != null && !thread.globallyPinned),
     });
   };
   const draggedThreadKey = dragState?.activeKey;
@@ -2237,7 +2245,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     if (activeSection === undefined || target === null || activeThread === undefined) return;
     const threadRef = scopeThreadRef(activeThread.environmentId, activeThread.id);
     const folderPinned =
-      activeThread.pinnedAt != null && !activeThread.globallyPinned && target.section === "active";
+      activeSection === "active" &&
+      activeThread.pinnedAt != null &&
+      !activeThread.globallyPinned &&
+      target.section === "active";
     const plan = planThreadDrop(activeKey, activeSection, activeThread, target);
     const moveToTargetFolder = () => {
       if (target.section === "active" && projectFolders === null) {

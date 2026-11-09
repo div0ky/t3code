@@ -322,8 +322,14 @@ export function resolveFolderDropOrder<T extends SidebarDropTarget>(
   target: T,
   serverOrder: readonly string[],
   activeKey: string,
+  excludedKeys?: ReadonlySet<string>,
 ): T {
-  if (target.section !== "active" || target.activeSlots.length === 0) return target;
+  if (target.section !== "active") return target;
+  if (target.activeSlots.length === 0)
+    return {
+      ...target,
+      activeOrder: target.activeOrder.filter((key) => !excludedKeys?.has(key)),
+    };
   const position = target.folderSiblings.indexOf(activeKey);
   const next = target.folderSiblings[position + 1];
   const previous = target.folderSiblings[position - 1];
@@ -335,7 +341,7 @@ export function resolveFolderDropOrder<T extends SidebarDropTarget>(
         ? order.indexOf(previous) + 1
         : -1;
   order.splice(anchor === -1 ? Math.max(serverOrder.indexOf(activeKey), 0) : anchor, 0, activeKey);
-  return { ...target, activeOrder: order };
+  return { ...target, activeOrder: order.filter((key) => !excludedKeys?.has(key)) };
 }
 
 export function placeSidebarPins<T extends { readonly globallyPinned?: boolean }>(
@@ -482,8 +488,10 @@ export function planSidebarThreadDrop(input: {
     activeKeysById,
     activeReorderableKeys,
   } = input;
-  const activeSection = input.folderPinned ? "pinned" : input.activeSection;
-  const target = input.folderPinned
+  const folderPinned =
+    input.folderPinned && input.activeSection === "active" && input.target.section === "active";
+  const activeSection = folderPinned ? "pinned" : input.activeSection;
+  const target = folderPinned
     ? {
         ...input.target,
         section: "pinned" as const,
