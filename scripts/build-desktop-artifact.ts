@@ -62,13 +62,9 @@ import { Command, Flag } from "effect/cli";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 const LINUX_ICON_SIZES = [16, 22, 24, 32, 48, 64, 128, 256, 512] as const;
-const OFFICIAL_DESKTOP_APP_ID = "com.t3tools.t3code";
-// A `-fork.N` build installs beside the official app, so it must not claim its bundle ID or schemes.
-const isForkDesktopVersion = (version: string) => /-fork\.\d+$/.test(version);
-const resolveDesktopAppId = (version: string) =>
-  isForkDesktopVersion(version) ? "com.div0ky.t3code" : OFFICIAL_DESKTOP_APP_ID;
-const resolveDesktopSchemes = (version: string) =>
-  isForkDesktopVersion(version) ? ["t3code-fork"] : ["t3code", "t3code-dev"];
+// D5 Code installs beside T3 Code, so it must not claim its bundle ID or schemes.
+const DESKTOP_APP_ID = "com.div0ky.t3code";
+const DESKTOP_SCHEMES = ["t3code-fork"];
 const APPLE_TEAM_ID_PATTERN = /^[A-Z0-9]{10}$/u;
 
 const BuildPlatform = Schema.Literals(["mac", "linux", "win"]);
@@ -1296,7 +1292,7 @@ export function resolveMacPasskeySigningConfiguration(
   }
 
   return {
-    appId: OFFICIAL_DESKTOP_APP_ID,
+    appId: DESKTOP_APP_ID,
     teamId,
     rpDomains: uniqueRpDomains,
     provisioningProfilePath,
@@ -2764,10 +2760,7 @@ export function resolvePackageManagerUserAgent(packageManager: string): string {
 }
 
 export function resolveDesktopProductName(version: string): string {
-  if (isForkDesktopVersion(version)) return "D5 Code";
-  return resolveDesktopUpdateChannel(version) === "nightly"
-    ? "D5 Code (Nightly)"
-    : (desktopPackageJson.productName ?? "D5 Code");
+  return resolveDesktopUpdateChannel(version) === "nightly" ? "D5 Code (Nightly)" : "D5 Code";
 }
 
 export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
@@ -2788,7 +2781,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
 ) {
   const buildConfig: Record<string, unknown> = {
     afterPack: (yield* Path.Path).join(yield* RepoRoot, "scripts/prepare-server-compile-cache.cjs"),
-    appId: resolveDesktopAppId(version),
+    appId: DESKTOP_APP_ID,
     productName: resolveDesktopProductName(version),
     artifactName: "D5-Code-${version}-${arch}.${ext}",
     electronLanguages: [...DESKTOP_ELECTRON_LANGUAGES],
@@ -2818,7 +2811,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   const updateChannel = resolveDesktopUpdateChannel(version);
   // Missing publish config infers a GitHub feed from tokens; staging has no repository, so manifest generation would crash.
   buildConfig.publish = null;
-  if (!isDesktopPreviewVersion(version) && !isForkDesktopVersion(version)) {
+  if (!isDesktopPreviewVersion(version)) {
     const publishConfig = yield* resolveGitHubPublishConfig(updateChannel);
     if (publishConfig) {
       buildConfig.publish = [publishConfig];
@@ -2865,7 +2858,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       protocols: [
         {
           name: "D5 Code",
-          schemes: resolveDesktopSchemes(version),
+          schemes: DESKTOP_SCHEMES,
         },
         {
           name: "Web site URL",
@@ -2874,9 +2867,9 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
         },
       ],
       ...(signed ? { sign: path.join(repoRoot, "scripts/sign-macos.ts") } : {}),
-      // Local fork builds keep a stable identity for keychain access; they are not notarized, so
+      // Local builds keep a stable identity for keychain access; they are not notarized, so
       // the hardened runtime would only block their unsigned native modules.
-      ...(!signed && isForkDesktopVersion(version) && Option.isSome(forkMacIdentity)
+      ...(!signed && Option.isSome(forkMacIdentity)
         ? { identity: forkMacIdentity.value, hardenedRuntime: false }
         : {}),
       ...(macPasskeySigning
@@ -2923,7 +2916,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       protocols: [
         {
           name: "D5 Code",
-          schemes: resolveDesktopSchemes(version),
+          schemes: DESKTOP_SCHEMES,
         },
       ],
       desktop: {
@@ -3877,7 +3870,7 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
       : undefined;
   const stagePackageJson: StagePackageJson = {
     // Electron names the keychain's Safe Storage item after this; sharing it prompts on every launch.
-    name: isForkDesktopVersion(appVersion) ? "t3code-div0ky" : "t3code",
+    name: "t3code-div0ky",
     version: appVersion,
     buildVersion: appVersion,
     t3codeCommitHash: commitHash,

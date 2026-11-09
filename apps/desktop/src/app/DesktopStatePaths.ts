@@ -1,8 +1,5 @@
 import * as Option from "effect/Option";
 
-// A `-fork.N` build runs beside an official install, so it owns its state, profile, and identity.
-export const isForkDesktopVersion = (version: string): boolean => /-fork\.\d+$/.test(version);
-
 export type JoinPath = (first: string, ...segments: string[]) => string;
 
 function normalizeConfiguredBaseDir(t3Home: Option.Option<string>): Option.Option<string> {
@@ -17,13 +14,11 @@ export function resolveDesktopBaseDir(input: {
   readonly homeDirectory: string;
   readonly joinPath: JoinPath;
   readonly t3Home: Option.Option<string>;
-  readonly appVersion?: string;
+  // A packaged D5 Code build runs beside T3 Code, so it must not share its state.
+  readonly isPackaged?: boolean;
 }): string {
   return Option.getOrElse(normalizeConfiguredBaseDir(input.t3Home), () =>
-    input.joinPath(
-      input.homeDirectory,
-      input.appVersion !== undefined && isForkDesktopVersion(input.appVersion) ? ".t3-fork" : ".t3",
-    ),
+    input.joinPath(input.homeDirectory, input.isPackaged ? ".t3-fork" : ".t3"),
   );
 }
 
