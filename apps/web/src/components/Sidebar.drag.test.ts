@@ -40,7 +40,9 @@ function layout(
   const rects = items.map((item) => {
     const height =
       item.kind === "thread"
-        ? (item.section === "pinned" || item.section === "active" ? cardHeight : 36) * scale
+        ? (item.section === "urgent" || item.section === "pinned" || item.section === "active"
+            ? cardHeight
+            : 36) * scale
         : item.marker === "pinned-header" || item.marker === "pinned-divider"
           ? 0
           : (item.marker.endsWith("placeholder") ? 0 : 32) * scale;
@@ -256,6 +258,29 @@ describe("sidebar drag projection", () => {
     for (const transform of restored.values()) expect(transform).toEqual(stationary);
 
     expect(preview({ ...input, enabled: true }, active, over)).toEqual(reordered);
+  });
+
+  it("measures urgent rows as cards, so they do not distort the drag preview", () => {
+    const items = [
+      pinnedHeader,
+      thread("p", "pinned"),
+      divider,
+      marker("active-placeholder"),
+      thread("a1", "active"),
+      thread("a2", "active"),
+      settledHeader,
+      marker("settled-placeholder"),
+      thread("s", "settled"),
+    ];
+    const input = { items, settledOrder: ["s"], settledExpanded: true, boundaryLabelHeight: 24 };
+    const plain = preview(input, "p", "a2");
+    const withUrgent = preview(
+      { ...input, items: [marker("urgent-header"), thread("u", "urgent"), ...items] },
+      "p",
+      "a2",
+    );
+    expect(withUrgent.get("a1")).toEqual(plain.get("a1"));
+    expect(withUrgent.get("a2")).toEqual(plain.get("a2"));
   });
 
   it.each([

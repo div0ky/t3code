@@ -199,6 +199,7 @@ export function createSidebarSortingStrategy(input: {
     const target = resolveSidebarDropTarget(items, active.key, sidebarListItemId(over));
     if (!target) return [];
     const groups: Record<SidebarSection, ThreadItem[]> = {
+      urgent: [],
       pinned: [],
       active: [],
       working: [],
@@ -216,7 +217,7 @@ export function createSidebarSortingStrategy(input: {
         }
         continue;
       }
-      if (item.section === "pinned" || item.section === "active" || item.section === "working")
+      if (item.section !== "snoozed" && item.section !== "settled")
         cardHeight ??= rects[index]?.height;
       else slimHeight ??= rects[index]?.height;
       if (item.key !== active.key) groups[item.section].push(item);
@@ -256,6 +257,10 @@ export function createSidebarSortingStrategy(input: {
       if (groups[name].length > 0) projected.push(...groups[name]);
       else marker(`${name}-placeholder`);
     };
+    if (groups.urgent.length > 0) {
+      marker("urgent-header");
+      projected.push(...groups.urgent);
+    }
     marker("pinned-header");
     projected.push(...groups.pinned);
     marker("pinned-divider");

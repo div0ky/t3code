@@ -201,7 +201,14 @@ function ThreadArrangementSheet(props: { onClose: () => void }) {
     const active = getThreadListV2OrderedSection({ ...shared, section: "active" });
     const visible = new Set([...pinned, ...active].map(keyOf));
     const parked = threads.filter(
-      (thread) => thread.archivedAt === null && !visible.has(keyOf(thread)),
+      (thread) =>
+        thread.archivedAt === null &&
+        !visible.has(keyOf(thread)) &&
+        // Urgent rows leave the ordered sections without being parked.
+        (thread.urgentAt == null ||
+          effectiveSnoozed(thread, { now }) ||
+          (thread.settledOverride === "settled" &&
+            queuedThreadKeys?.has(`${thread.environmentId}:${thread.id}`) !== true)),
     );
     return {
       pinned,

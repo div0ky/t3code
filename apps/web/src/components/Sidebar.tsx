@@ -34,7 +34,7 @@ import {
   createInboxReturnTracker,
   isThreadWorking,
 } from "@t3tools/client-runtime/state/thread-inbox";
-import { sortSettledThreads } from "@t3tools/client-runtime/state/thread-sort";
+import { sortSettledThreads, sortUrgentThreads } from "@t3tools/client-runtime/state/thread-sort";
 import {
   nextShownOrder,
   threadSearchMatchKey,
@@ -281,6 +281,7 @@ import {
 import {
   SidebarDragBoundary,
   SidebarSectionHeader,
+  SidebarUrgentHeader,
   SidebarSectionPlaceholder,
 } from "./sidebar/SidebarListMarkers";
 
@@ -413,6 +414,9 @@ function resolveDraggedOrders(input: {
   };
 }
 
+const withoutUrgentThreads = (threads: readonly EnvironmentThreadShell[]) =>
+  threads.filter((thread) => thread.urgentAt == null);
+
 function routeThreadOnly(
   threads: readonly EnvironmentThreadShell[],
   routeThreadKey: string | null,
@@ -501,7 +505,7 @@ function useSidebarThreads(input: {
     clockKey: `${nowMinute}:${snoozeWakeClock}:${inboxReturnsVersion}`,
   });
 
-  const { workingThreads, snoozedThreads, settledThreads } = partition;
+  const { urgentThreads, workingThreads, snoozedThreads, settledThreads } = partition;
   const { pinnedThreads, activeThreads } = placeSidebarPins(
     partition.pinnedThreads,
     partition.activeThreads,
@@ -541,7 +545,12 @@ function useSidebarThreads(input: {
   const projectFolders =
     folderGroups === null
       ? null
-      : groupSidebarThreadsByProject(folderGroups, activeThreads, keepEmpty).map((folder) => {
+      : groupSidebarThreadsByProject(
+          folderGroups,
+          [...urgentThreads, ...activeThreads],
+          keepEmpty,
+        ).map((folder) => {
+          const folderThreads = withoutUrgentThreads(folder.threads);
           const collapsed = !resolveProjectExpanded(
             projectExpandedById,
             sidebarFolderExpansionKeys(folder.group),
@@ -549,31 +558,36 @@ function useSidebarThreads(input: {
           return {
             group: folder.group,
             collapsed,
+            urgentCount: folder.threads.length - folderThreads.length,
             // A closed folder still shows the open thread, and hints at the rest.
-            threads: collapsed
-              ? routeThreadOnly(folder.threads, routeRowThreadKey)
-              : folder.threads,
+            threads: collapsed ? routeThreadOnly(folderThreads, routeRowThreadKey) : folderThreads,
             hiddenThreads: collapsed
-              ? folder.threads.filter((thread) => threadShellKey(thread) !== routeRowThreadKey)
+              ? folderThreads.filter((thread) => threadShellKey(thread) !== routeRowThreadKey)
               : EMPTY_THREADS,
           };
         });
   // Project folders replace these; the two groupings would fight over the same rows.
-  const { unfiled: unfiledThreads, folders: groupedFolders } = groupThreadsBySidebarFolder({
-    threads: activeThreads,
+  const { unfiled: groupedUnfiledThreads, folders: groupedFolders } = groupThreadsBySidebarFolder({
+    threads: [...urgentThreads, ...activeThreads],
     folders: folderGroups === null ? sidebarFolders : [],
     folderIdByThreadKey,
     keyOf: threadShellKey,
   });
-  const customFolders = groupedFolders.map(({ folder, threads: folderThreads }) => ({
-    folder,
-    threadCount: folderThreads.length,
-    threads: folder.collapsed ? routeThreadOnly(folderThreads, routeRowThreadKey) : folderThreads,
-    hiddenThreads: folder.collapsed
-      ? folderThreads.filter((thread) => threadShellKey(thread) !== routeRowThreadKey)
-      : EMPTY_THREADS,
-  }));
+  const unfiledThreads = withoutUrgentThreads(groupedUnfiledThreads);
+  const customFolders = groupedFolders.map(({ folder, threads: groupedThreads }) => {
+    const folderThreads = withoutUrgentThreads(groupedThreads);
+    return {
+      folder,
+      threadCount: folderThreads.length,
+      urgentCount: groupedThreads.length - folderThreads.length,
+      threads: folder.collapsed ? routeThreadOnly(folderThreads, routeRowThreadKey) : folderThreads,
+      hiddenThreads: folder.collapsed
+        ? folderThreads.filter((thread) => threadShellKey(thread) !== routeRowThreadKey)
+        : EMPTY_THREADS,
+    };
+  });
   const orderedThreads = [
+    ...urgentThreads,
     ...pinnedThreads,
     ...(projectFolders === null
       ? [...unfiledThreads, ...customFolders.flatMap((folder) => folder.threads)]
@@ -584,6 +598,7 @@ function useSidebarThreads(input: {
   ];
   const sectionByThreadKey = new Map<string, SidebarSection>();
   for (const [list, section] of [
+    [urgentThreads, "urgent"],
     [pinnedThreads, "pinned"],
     [activeThreads, "active"],
     [workingThreads, "working"],
@@ -599,6 +614,7 @@ function useSidebarThreads(input: {
     threads,
     workingShelfEnabled,
     searchableThreads: [
+      ...urgentThreads,
       ...pinnedThreads,
       ...activeThreads,
       ...workingThreads,
@@ -659,6 +675,7 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
   const preciseNow = new Date().toISOString();
   const visible = filterSidebarV2VisibleThreads(threads, scopedProjectKeys, delegatedUnderParent);
   const inboxObservation = inboxReturns.observe(workingShelfEnabled ? threads : null);
+  const urgent: EnvironmentThreadShell[] = [];
   const pinned: EnvironmentThreadShell[] = [];
   const active: EnvironmentThreadShell[] = [];
   const working: EnvironmentThreadShell[] = [];
@@ -685,11 +702,13 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
         optimisticDrop.assignedKeys.get(threadKey),
       );
       const projected = { ...dropped, globallyPinned: optimisticDrop.section === "pinned" };
-      (optimisticDrop.section === "pinned"
-        ? pinned
-        : optimisticDrop.section === "settled"
-          ? settled
-          : inbox(projected, true)
+      (optimisticDrop.section === "settled"
+        ? settled
+        : thread.urgentAt != null
+          ? urgent
+          : optimisticDrop.section === "pinned"
+            ? pinned
+            : inbox(projected, true)
       ).push(
         optimisticDrop.clearsSnooze
           ? projected
@@ -699,15 +718,18 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
       const section = resolveSidebarThreadSection({
         snoozed: configLoaded && effectiveSnoozed(thread, { now: preciseNow }),
         settled: configLoaded && thread.settledOverride === "settled",
+        urgent: thread.urgentAt != null,
         pinned: thread.pinnedAt != null,
       });
       (section === "snoozed"
         ? snoozed
         : section === "settled"
           ? settled
-          : section === "pinned"
-            ? pinned
-            : inbox(thread)
+          : section === "urgent"
+            ? urgent
+            : section === "pinned"
+              ? pinned
+              : inbox(thread)
       ).push(thread);
     }
   }
@@ -719,6 +741,7 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
       ? sortInboxThreadsByReturn(active, inboxObservation.returnedAt)
       : sortThreadsForSidebar(active);
   return {
+    urgentThreads: sortUrgentThreads(urgent),
     pinnedThreads:
       optimisticDrop?.section !== "pinned" || optimisticDrop.order === null
         ? sortedPinned
@@ -1389,6 +1412,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
 
   const {
     workingShelfEnabled,
+    urgentThreads,
     pinnedThreads,
     draggableThreadKeys,
     activeReorderableThreadKeys,
@@ -1811,6 +1835,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const isContextDrag =
     projectFolders !== null ||
     dragState?.contextDrag === true ||
+    dragState?.activeSection === "urgent" ||
     dragState?.activeSection === "working";
   const dragTargetSection = isContextDrag ? null : (dragState?.targetSection ?? null);
   const dragTargetFolderId =
@@ -2042,7 +2067,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     if (
       !hasProjectFolders &&
       customFolders.length === 0 &&
-      pinnedThreads.length +
+      urgentThreads.length +
+        pinnedThreads.length +
         activeThreads.length +
         workingThreads.length +
         snoozedThreads.length +
@@ -2051,7 +2077,12 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     ) {
       return [];
     }
-    const items: SidebarListItem[] = [{ kind: "marker", marker: "pinned-header" }];
+    const items: SidebarListItem[] = [];
+    if (urgentThreads.length > 0) {
+      items.push({ kind: "marker", marker: "urgent-header" });
+      items.push(...rowsOf(urgentThreads, "urgent"));
+    }
+    items.push({ kind: "marker", marker: "pinned-header" });
     const pinnedRows = rowsOf(pinnedThreads, "pinned");
     items.push(...pinnedRows);
     items.push({ kind: "marker", marker: "pinned-divider" });
@@ -3575,7 +3606,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                           scopeThreadRef(thread.environmentId, thread.id),
                         );
                         const isCard =
-                          section === "active" || section === "pinned" || section === "working";
+                          section === "urgent" ||
+                          section === "active" ||
+                          section === "pinned" ||
+                          section === "working";
                         const rowVariant =
                           folderRow && projectFolders !== null
                             ? folderRowsMultiline
@@ -3721,6 +3755,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                                 key={item.marker}
                                 folder={entry.folder}
                                 threadCount={entry.threadCount}
+                                urgentCount={entry.urgentCount}
                                 hiddenThreads={entry.hiddenThreads}
                                 isDropTarget={
                                   from !== null && dragTargetFolderId === customFolderId
@@ -3742,6 +3777,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                                 key={`project-folder:${folder.group.projectKey}`}
                                 group={folder.group}
                                 collapsed={folder.collapsed}
+                                urgentCount={folder.urgentCount}
                                 hiddenThreads={folder.hiddenThreads}
                                 onToggle={toggleProjectFolder}
                                 onNewThread={startThreadInProjectFolder}
@@ -3761,6 +3797,14 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                           continue;
                         }
                         switch (item.marker) {
+                          case "urgent-header":
+                            items.push(
+                              <SidebarUrgentHeader
+                                key="urgent-header"
+                                count={urgentThreads.length}
+                              />,
+                            );
+                            break;
                           case "pinned-header":
                             items.push(
                               <SidebarDragBoundary
@@ -3908,7 +3952,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           !hasProjectFolders &&
           customFolders.length === 0 &&
           visibleDraftSessionCount === 0 &&
-          pinnedThreads.length +
+          urgentThreads.length +
+            pinnedThreads.length +
             activeThreads.length +
             workingThreads.length +
             snoozedThreads.length +

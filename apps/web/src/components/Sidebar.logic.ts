@@ -172,15 +172,17 @@ export const animateSidebarLayoutChanges: AnimateLayoutChanges = (args) =>
 
 // Snoozed rows cannot accept drops without a wake time. Working rows only drag out as chat context.
 
-export type SidebarSection = "pinned" | "active" | "working" | "snoozed" | "settled";
+export type SidebarSection = "urgent" | "pinned" | "active" | "working" | "snoozed" | "settled";
 
 export function resolveSidebarThreadSection(input: {
   readonly snoozed: boolean;
   readonly settled: boolean;
+  readonly urgent: boolean;
   readonly pinned: boolean;
 }): SidebarSection {
   if (input.snoozed) return "snoozed";
   if (input.settled) return "settled";
+  if (input.urgent) return "urgent";
   if (input.pinned) return "pinned";
   return "active";
 }
@@ -188,6 +190,7 @@ export function resolveSidebarThreadSection(input: {
 const SIDEBAR_MARKER_PREFIX = "sidebar-marker-";
 
 export type SidebarListMarker =
+  | "urgent-header"
   | "pinned-header"
   | "active-placeholder"
   | "settled-placeholder"
@@ -226,7 +229,9 @@ function sectionAtSidebarSlot(items: readonly SidebarListItem[], index: number):
   for (let i = 0; i < index && i < items.length; i += 1) {
     const item = items[i]!;
     if (item.kind !== "marker") continue;
-    if (item.marker === "pinned-divider") section = "active";
+    if (item.marker === "urgent-header") section = "urgent";
+    else if (item.marker === "pinned-header") section = "pinned";
+    else if (item.marker === "pinned-divider") section = "active";
     else if (item.marker === "working-header") section = "working";
     else if (item.marker === "snoozed-header") section = "snoozed";
     else if (item.marker === "settled-header") section = "settled";
@@ -260,18 +265,25 @@ export function resolveSidebarDropTarget(
   const moved = items.filter((_, index) => index !== activeIndex);
   // A folder header always means "into this folder", from either direction, so a collapsed folder
   // accepts drops from below too.
-  const slot = isSidebarFolderItem(items[overIndex])
+  const overItem = items[overIndex];
+  if (overItem?.kind === "marker" && overItem.marker === "urgent-header") return null;
+  const dropsBelowOver =
+    isSidebarFolderItem(overItem) ||
+    (overItem?.kind === "marker" && overItem.marker === "pinned-header");
+  const slot = dropsBelowOver
     ? moved.findIndex((item) => sidebarListItemId(item) === overId) + 1
     : overIndex;
   moved.splice(slot, 0, items[activeIndex]!);
   const section = sectionAtSidebarSlot(moved, slot);
-  if (section === "working" || section === "snoozed") return null;
+  if (section === "urgent" || section === "working" || section === "snoozed") return null;
   const pinnedOrder: string[] = [];
   const activeOrder: string[] = [];
   let currentSection: SidebarSection = "pinned";
   for (const item of moved) {
     if (item.kind === "marker") {
-      if (item.marker === "pinned-divider") currentSection = "active";
+      if (item.marker === "urgent-header") currentSection = "urgent";
+      else if (item.marker === "pinned-header") currentSection = "pinned";
+      else if (item.marker === "pinned-divider") currentSection = "active";
       else if (
         item.marker === "working-header" ||
         item.marker === "snoozed-header" ||
@@ -279,7 +291,7 @@ export function resolveSidebarDropTarget(
       )
         break;
     } else if (currentSection === "pinned") pinnedOrder.push(item.key);
-    else activeOrder.push(item.key);
+    else if (currentSection === "active") activeOrder.push(item.key);
   }
   const hasFolders = items.some(isSidebarFolderItem);
   const dividerIndex = moved.findIndex(
@@ -404,7 +416,8 @@ export function resolveSidebarDropVerb(
   from: SidebarSection,
   to: SidebarSection | null,
 ): SidebarDropVerb | null {
-  if (to === null || to === from || to === "working" || to === "snoozed") return null;
+  if (to === null || to === from || to === "urgent" || to === "working" || to === "snoozed")
+    return null;
   if (to === "pinned") return "pin";
   if (to === "settled") return "settle";
   if (from === "pinned") return "unpin";
@@ -498,7 +511,7 @@ export function planSidebarThreadDrop(input: {
         pinnedOrder: input.target.activeOrder.filter((key) => pinnedKeysById.has(key)),
       }
     : input.target;
-  if (activeSection === "working") return { kind: "none" };
+  if (activeSection === "urgent" || activeSection === "working") return { kind: "none" };
   if (input.supportsSettlement === false && (target.section === "settled" || activeSettled)) {
     return { kind: "none" };
   }
@@ -1023,11 +1036,8 @@ export function resolveSidebarThreadStatus(thread: SidebarThreadStatusInput): Si
  * hidden threads. Waiting threads stay quiet, like their rows.
  */
 export function resolveSidebarFolderDot(
-  threads: ReadonlyArray<
-    ThreadStatusInput & SidebarThreadStatusInput & { readonly urgentAt?: string | null }
-  >,
-): "urgent" | "attention" | "failed" | "unread" | "working" | null {
-  if (threads.some((thread) => thread.urgentAt != null)) return "urgent";
+  threads: ReadonlyArray<ThreadStatusInput & SidebarThreadStatusInput>,
+): "attention" | "failed" | "unread" | "working" | null {
   const statuses = new Set(threads.map(resolveSidebarThreadStatus));
   if (
     statuses.has("input") ||

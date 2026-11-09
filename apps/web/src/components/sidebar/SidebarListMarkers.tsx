@@ -1,5 +1,6 @@
 import { CollapsibleSectionHeader } from "../ui/collapsible-section-header";
 import { useSortable } from "@dnd-kit/sortable";
+import { FlameIcon } from "lucide-react";
 import { CSS } from "@dnd-kit/utilities";
 import { type ReactNode, useLayoutEffect } from "react";
 import { cn } from "~/lib/utils";
@@ -106,6 +107,36 @@ export function SidebarDragBoundary(props: {
           />
         </div>
       ) : null}
+    </SortableSidebarMarker>
+  );
+}
+
+export function SidebarUrgentCountBadge(props: { count: number; className?: string }) {
+  return (
+    <span
+      aria-label={`${props.count} urgent`}
+      className={cn(
+        "shrink-0 rounded-full bg-error px-1.5 text-xs leading-4 font-medium tabular-nums text-white",
+        props.className,
+      )}
+    >
+      {props.count}
+    </span>
+  );
+}
+
+export function SidebarUrgentHeader(props: { count: number }) {
+  return (
+    <SortableSidebarMarker
+      marker="urgent-header"
+      data-testid="sidebar-urgent-header"
+      className="relative mx-0.5 h-8"
+    >
+      <div className="flex h-8 items-center gap-2 px-2 text-xs font-medium text-error-foreground">
+        <FlameIcon aria-hidden className="size-3.5 shrink-0" />
+        <span className="flex-1">Urgent</span>
+        <span className="font-normal tabular-nums">{props.count}</span>
+      </div>
     </SortableSidebarMarker>
   );
 }
