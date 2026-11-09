@@ -2668,6 +2668,25 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
         })
         .pipe(Effect.flip);
       assert.instanceOf(staleAutoSettle, Orchestrator.OrchestratorDispatchError);
+      for (const urgent of [true, false]) {
+        yield* orchestrator.dispatch({
+          type: "thread.urgent.set",
+          commandId: CommandId.make(`runtime-layer-lifecycle-urgent-${urgent}`),
+          threadId,
+          urgent,
+        });
+        if (urgent) {
+          const urgentAutoSettle = yield* orchestrator
+            .dispatch({
+              type: "thread.auto-settle",
+              commandId: CommandId.make("runtime-layer-lifecycle-auto-settle-urgent"),
+              threadId,
+              snapshotAt: preAutoProjection.thread.updatedAt,
+            })
+            .pipe(Effect.flip);
+          assert.instanceOf(urgentAutoSettle, Orchestrator.OrchestratorDispatchError);
+        }
+      }
       yield* orchestrator.dispatch({
         type: "thread.auto-settle",
         commandId: CommandId.make("runtime-layer-lifecycle-auto-settle"),

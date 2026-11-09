@@ -674,15 +674,6 @@ it.effect(
         threadId,
         urgent: true,
       });
-      const autoSettle = yield* Effect.exit(
-        orchestrator.dispatch({
-          type: "thread.auto-settle",
-          commandId: CommandId.make("auto-settle-urgent"),
-          threadId,
-          snapshotAt: yield* DateTime.now,
-        }),
-      );
-      assert.equal(autoSettle._tag, "Failure");
       yield* orchestrator.dispatch({
         type: "thread.archive",
         commandId: CommandId.make("archive-with-old-history"),
