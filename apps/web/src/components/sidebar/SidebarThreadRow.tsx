@@ -986,7 +986,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     isUrgent &&
       cn(
         urgentEdgeClassName,
-        props.isActive || isSelected
+        props.isActive || isSelected || props.sweepAction !== null
           ? "bg-destructive/24"
           : "bg-destructive/9 hover:bg-destructive/14",
       ),

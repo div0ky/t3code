@@ -1419,7 +1419,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
 
   const urgentBackdrop = isUrgent ? (
     <>
-      <View pointerEvents="none" className="absolute inset-0 bg-danger" />
+      {selected ? null : <View pointerEvents="none" className="absolute inset-0 bg-danger" />}
       <View
         pointerEvents="none"
         className="absolute bottom-1 left-0 top-1 w-0.5 bg-danger-foreground"
