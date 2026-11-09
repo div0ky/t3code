@@ -234,7 +234,7 @@ function sectionAtSidebarSlot(items: readonly SidebarListItem[], index: number):
   return section;
 }
 
-type SidebarDropTarget = {
+export type SidebarDropTarget = {
   readonly section: "pinned" | "active" | "settled";
   readonly pinnedOrder: readonly string[];
   readonly activeOrder: readonly string[];
@@ -336,6 +336,16 @@ export function resolveFolderDropOrder<T extends SidebarDropTarget>(
         : -1;
   order.splice(anchor === -1 ? Math.max(serverOrder.indexOf(activeKey), 0) : anchor, 0, activeKey);
   return { ...target, activeOrder: order };
+}
+
+export function placeSidebarPins<T extends { readonly globallyPinned?: boolean }>(
+  pinned: readonly T[],
+  active: readonly T[],
+) {
+  return {
+    pinnedThreads: pinned.filter((thread) => thread.globallyPinned === true),
+    activeThreads: [...pinned.filter((thread) => thread.globallyPinned !== true), ...active],
+  };
 }
 
 export function groupThreadsBySidebarFolder<T>(input: {
@@ -446,6 +456,7 @@ export function resolveSidebarReorderableThreadKeys(input: {
 }
 
 export function planSidebarThreadDrop(input: {
+  readonly folderPinned?: boolean;
   readonly activeKey: string;
   readonly activeSection: SidebarSection;
   readonly activePinned?: boolean;
@@ -462,10 +473,8 @@ export function planSidebarThreadDrop(input: {
 }): SidebarThreadDropPlan {
   const {
     activeKey,
-    activeSection,
-    activePinned = activeSection === "pinned",
-    activeSettled = activeSection === "settled",
-    target,
+    activePinned = input.activeSection === "pinned",
+    activeSettled = input.activeSection === "settled",
     pinnedOrder,
     pinnedKeysById,
     reorderableKeys,
@@ -473,6 +482,14 @@ export function planSidebarThreadDrop(input: {
     activeKeysById,
     activeReorderableKeys,
   } = input;
+  const activeSection = input.folderPinned ? "pinned" : input.activeSection;
+  const target = input.folderPinned
+    ? {
+        ...input.target,
+        section: "pinned" as const,
+        pinnedOrder: input.target.activeOrder.filter((key) => pinnedKeysById.has(key)),
+      }
+    : input.target;
   if (activeSection === "working") return { kind: "none" };
   if (input.supportsSettlement === false && (target.section === "settled" || activeSettled)) {
     return { kind: "none" };

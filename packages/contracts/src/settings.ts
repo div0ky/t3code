@@ -1341,6 +1341,11 @@ export const SidebarFolderOperation = Schema.Union([
   }),
   Schema.Struct({ action: Schema.Literal("delete"), folderId: TrimmedNonEmptyString }),
   Schema.Struct({
+    action: Schema.Literal("reorder"),
+    folderId: TrimmedNonEmptyString,
+    beforeFolderId: Schema.NullOr(TrimmedNonEmptyString),
+  }),
+  Schema.Struct({
     action: Schema.Literal("move_threads"),
     threadIds: Schema.Array(ThreadId),
     // Null takes the threads out of every folder.
@@ -1366,6 +1371,22 @@ export function applySidebarFolderOperation(
       );
     case "delete":
       return folders.filter((folder) => folder.id !== operation.folderId);
+    case "reorder": {
+      const moved = folders.find((folder) => folder.id === operation.folderId);
+      if (!moved || operation.folderId === operation.beforeFolderId) return folders;
+      if (
+        operation.beforeFolderId !== null &&
+        !folders.some((folder) => folder.id === operation.beforeFolderId)
+      )
+        return folders;
+      const reordered = folders.filter((folder) => folder.id !== operation.folderId);
+      const index =
+        operation.beforeFolderId === null
+          ? reordered.length
+          : reordered.findIndex((folder) => folder.id === operation.beforeFolderId);
+      reordered.splice(index, 0, moved);
+      return reordered;
+    }
     case "move_threads": {
       if (
         operation.folderId !== null &&

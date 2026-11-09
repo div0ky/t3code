@@ -194,7 +194,9 @@ import {
   isTrailingDoubleClick,
   orderItemsByPreferredIds,
   groupThreadsBySidebarFolder,
+  placeSidebarPins,
   planSidebarThreadDrop,
+  type SidebarDropTarget,
   resolveFolderDropOrder,
   sidebarFolderIdOfMarker,
   sidebarFolderMarker,
@@ -401,12 +403,13 @@ function resolveDraggedOrders(input: {
       ...others(settledThreads),
       applySidebarThreadDrop(thread, "settled", drag.occurredAt),
     ]).map(threadShellKey),
-    activeOrder: workingShelfEnabled
-      ? sortInboxThreadsByReturn(
-          [...others(activeThreads), applySidebarThreadDrop(thread, "active", drag.occurredAt)],
-          inboxReturns.returnedAt,
-        ).map(threadShellKey)
-      : undefined,
+    activeOrder:
+      workingShelfEnabled && thread.pinnedAt == null
+        ? sortInboxThreadsByReturn(
+            [...others(activeThreads), applySidebarThreadDrop(thread, "active", drag.occurredAt)],
+            inboxReturns.returnedAt,
+          ).map(threadShellKey)
+        : undefined,
   };
 }
 
@@ -498,8 +501,11 @@ function useSidebarThreads(input: {
     clockKey: `${nowMinute}:${snoozeWakeClock}:${inboxReturnsVersion}`,
   });
 
-  const { pinnedThreads, activeThreads, workingThreads, snoozedThreads, settledThreads } =
-    partition;
+  const { workingThreads, snoozedThreads, settledThreads } = partition;
+  const { pinnedThreads, activeThreads } = placeSidebarPins(
+    partition.pinnedThreads,
+    partition.activeThreads,
+  );
   // Older settled threads load in pages; the shelf lists them only as far as they are loaded.
   const olderSettledShelf = useOlderSettledShelf({
     scopes: olderSettledScopes([...serverConfigs.keys()], scopedProjectKeys),
@@ -588,6 +594,8 @@ function useSidebarThreads(input: {
   }
   return {
     ...partition,
+    pinnedThreads,
+    activeThreads,
     threads,
     workingShelfEnabled,
     searchableThreads: [
@@ -670,12 +678,13 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
     const configLoaded = serverConfigs.has(thread.environmentId);
     const threadKey = scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id));
     if (optimisticDrop?.key === threadKey) {
-      const projected = applySidebarThreadDrop(
+      const dropped = applySidebarThreadDrop(
         thread,
         optimisticDrop.section,
         optimisticDrop.occurredAt,
         optimisticDrop.assignedKeys.get(threadKey),
       );
+      const projected = { ...dropped, globallyPinned: optimisticDrop.section === "pinned" };
       (optimisticDrop.section === "pinned"
         ? pinned
         : optimisticDrop.section === "settled"
@@ -779,7 +788,7 @@ function isOptimisticDropReleased(input: {
     ? "snoozed"
     : thread.settledOverride === "settled"
       ? "settled"
-      : thread.pinnedAt != null
+      : thread.pinnedAt != null && thread.globallyPinned
         ? "pinned"
         : "active";
   if (
@@ -792,7 +801,7 @@ function isOptimisticDropReleased(input: {
     // Settle emits unpin/unsnooze too; hold projected fields and sort times until the whole move completes.
     if (
       canonicalSection === optimisticDrop.section &&
-      thread.pinnedAt == null &&
+      (!thread.pinnedAt || !thread.globallyPinned) &&
       (!optimisticDrop.clearsSnooze || thread.snoozedUntil == null)
     ) {
       return true;
@@ -1296,12 +1305,24 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const cancelFolderRename = useStableCallback(() => setRenamingFolderId(null));
   const handleCustomFolderContextMenu = useStableCallback(
     (folderId: string, position: { x: number; y: number }) => {
+      const { folders, environmentIdByFolderId } = useSidebarFoldersStore.getState();
+      const siblings = folders.filter(
+        (folder) => environmentIdByFolderId[folder.id] === environmentIdByFolderId[folderId],
+      );
+      const index = siblings.findIndex((folder) => folder.id === folderId);
       const api = readLocalApi();
       if (!api) return;
       void (async () => {
         const clicked = await settlePromise(() =>
           api.contextMenu.show(
             [
+              { id: "move-up", label: "Move up", icon: "arrow-up", disabled: index <= 0 },
+              {
+                id: "move-down",
+                label: "Move down",
+                icon: "arrow-down",
+                disabled: index < 0 || index === siblings.length - 1,
+              },
               { id: "rename", label: "Rename folder" },
               { id: "delete", label: "Delete folder", destructive: true },
             ],
@@ -1309,7 +1330,11 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           ),
         );
         if (clicked._tag === "Failure") return;
-        if (clicked.value === "rename") setRenamingFolderId(folderId);
+        if (clicked.value === "move-up" || clicked.value === "move-down")
+          useSidebarFoldersStore
+            .getState()
+            .reorderFolder(folderId, clicked.value === "move-up" ? "up" : "down");
+        else if (clicked.value === "rename") setRenamingFolderId(folderId);
         // Its threads stay put in the active list; only the grouping goes away.
         else if (clicked.value === "delete")
           useSidebarFoldersStore.getState().deleteFolder(folderId);
@@ -1931,9 +1956,9 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   ) {
     setOptimisticDrop(null);
   }
-  const attemptPin = (threadRef: ScopedThreadRef) => {
+  const attemptPin = (threadRef: ScopedThreadRef, globallyPinned = false) => {
     void (async () => {
-      const result = await pinThread(threadRef);
+      const result = await pinThread(threadRef, { globallyPinned });
       if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
         const error = squashAtomCommandFailure(result);
         toastManager.add(
@@ -2139,6 +2164,46 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     section === "active" &&
     target.section === "active" &&
     target.folderId !== (useSidebarFoldersStore.getState().folderIdByThreadKey[threadKey] ?? null);
+  const folderPinKeysById = new Map(
+    activeThreads
+      .filter((thread) => thread.pinnedAt != null)
+      .map((thread) => [threadShellKey(thread), thread.pinOrderKey]),
+  );
+  const planThreadDrop = (
+    activeKey: string,
+    activeSection: SidebarSection,
+    thread: EnvironmentThreadShell,
+    target: SidebarDropTarget,
+  ) => {
+    const folderPinned =
+      thread.pinnedAt != null && !thread.globallyPinned && target.section === "active";
+    const folderIds = useSidebarFoldersStore.getState().folderIdByThreadKey;
+    return planSidebarThreadDrop({
+      activeKey,
+      activeSection,
+      folderPinned,
+      activePinned: thread.pinnedAt != null && thread.globallyPinned === true,
+      activeSettled: thread.settledOverride === "settled",
+      supportsSettlement: serverConfigs.has(thread.environmentId),
+      target: folderPinned
+        ? {
+            ...target,
+            activeOrder: target.activeSlots.length ? target.folderSiblings : target.activeOrder,
+          }
+        : resolveFolderDropOrder(target, activeKeys, activeKey),
+      pinnedOrder: folderPinned
+        ? activeKeys.filter(
+            (key) => folderPinKeysById.has(key) && (folderIds[key] ?? null) === target.folderId,
+          )
+        : pinnedKeys,
+      pinnedKeysById: folderPinned ? folderPinKeysById : pinnedKeysById,
+      reorderableKeys: draggableThreadKeys,
+      activeOrder: activeKeys,
+      activeKeysById,
+      activeReorderableKeys: activeReorderableThreadKeys,
+      activeTimeOrdered: workingShelfEnabled,
+    });
+  };
   const draggedThreadKey = dragState?.activeKey;
   const draggedFromSection = dragState?.activeSection;
   const dragActivationY = dragState?.activationY;
@@ -2152,23 +2217,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         const target = resolveSidebarDropTarget(sidebarListItems, draggedThreadKey, id);
         if (target === null) return false;
         if (isFolderMove(draggedThreadKey, draggedFromSection, target)) return true;
-        return (
-          planSidebarThreadDrop({
-            activeKey: draggedThreadKey,
-            activeSection: draggedFromSection,
-            activePinned: source.pinnedAt != null,
-            activeSettled: source.settledOverride === "settled",
-            supportsSettlement: serverConfigs.has(source.environmentId),
-            target: resolveFolderDropOrder(target, activeKeys, draggedThreadKey),
-            pinnedOrder: pinnedKeys,
-            pinnedKeysById,
-            reorderableKeys: draggableThreadKeys,
-            activeOrder: activeKeys,
-            activeKeysById,
-            activeReorderableKeys: activeReorderableThreadKeys,
-            activeTimeOrdered: workingShelfEnabled,
-          }).kind !== "none"
-        );
+        return planThreadDrop(draggedThreadKey, draggedFromSection, source, target).kind !== "none";
       },
       {
         items: sidebarListItems,
@@ -2187,21 +2236,9 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     const activeThread = threadByKey.get(activeKey);
     if (activeSection === undefined || target === null || activeThread === undefined) return;
     const threadRef = scopeThreadRef(activeThread.environmentId, activeThread.id);
-    const plan = planSidebarThreadDrop({
-      activeKey,
-      activeSection,
-      activePinned: activeThread.pinnedAt != null,
-      activeSettled: activeThread.settledOverride === "settled",
-      supportsSettlement: serverConfigs.has(activeThread.environmentId),
-      target: resolveFolderDropOrder(target, activeKeys, activeKey),
-      pinnedOrder: pinnedKeys,
-      pinnedKeysById,
-      reorderableKeys: draggableThreadKeys,
-      activeOrder: activeKeys,
-      activeKeysById,
-      activeReorderableKeys: activeReorderableThreadKeys,
-      activeTimeOrdered: workingShelfEnabled,
-    });
+    const folderPinned =
+      activeThread.pinnedAt != null && !activeThread.globallyPinned && target.section === "active";
+    const plan = planThreadDrop(activeKey, activeSection, activeThread, target);
     const moveToTargetFolder = () => {
       if (target.section === "active" && projectFolders === null) {
         useSidebarFoldersStore.getState().moveThread(activeKey, target.folderId);
@@ -2244,7 +2281,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       keysAtDrop: target.section === "active" ? activeKeysById : pinnedKeysById,
       assignedKeys: new Map(assignments.map(({ id, orderKey }) => [id, orderKey])),
     };
-    setOptimisticDrop(drop);
+    if (!folderPinned) setOptimisticDrop(drop);
     void (async () => {
       const run = async (
         operation: Promise<AtomCommandResult<unknown, unknown>>,
@@ -2298,7 +2335,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         case "pin":
           if (
             !(await run(
-              pinThread(threadRef, plan.orderKey === undefined ? {} : { orderKey: plan.orderKey }),
+              pinThread(threadRef, { orderKey: plan.orderKey, globallyPinned: true }),
               "Failed to pin thread",
             ))
           )
@@ -2754,6 +2791,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                       }
                     : null,
                 isPinned,
+                isGloballyPinned: thread.globallyPinned === true,
                 isSettled,
                 autoSettleEnabled: thread.autoSettleDisabledAt == null,
                 isSnoozed,
@@ -2773,11 +2811,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 },
                 snoozePresets,
               }),
-              ...(folderChoices.length > 0 &&
-              !boringSidebarEnabled &&
-              !isPinned &&
-              !isSettled &&
-              !isSnoozed
+              ...(folderChoices.length > 0 && !boringSidebarEnabled && !isSettled && !isSnoozed
                 ? [
                     {
                       id: "move-to-folder" as const,
@@ -2875,6 +2909,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           case "unsnooze":
             attemptUnsnooze(threadRef);
             return;
+          case "global-pin":
+            attemptPin(threadRef, true);
+            return;
+          case "folder-pin":
           case "pin":
             attemptPin(threadRef);
             return;
@@ -3697,7 +3735,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               <SidebarDragBoundary
                                 key="pinned-header"
                                 marker="pinned-header"
-                                label="Pinned"
+                                label="Global Pins"
                                 visible={from !== null}
                                 isDropTarget={dragTargetSection === "pinned"}
                               />,

@@ -32,6 +32,8 @@ import {
   type SidebarSection,
   resolveSidebarDropVerb,
   groupSidebarThreadsByProject,
+  placeSidebarPins,
+  groupThreadsBySidebarFolder,
   resolveSidebarFolderDot,
   sidebarFolderExpansionKeys,
 } from "./Sidebar.logic";
@@ -1649,4 +1651,43 @@ describe("shouldCreateNewThreadInCurrentProject", () => {
     expect(shouldCreateNewThreadInCurrentProject(false, 0, 0)).toBe(true);
     expect(shouldCreateNewThreadInCurrentProject(true, 2, 2)).toBe(true);
   });
+});
+
+it("keeps ordinary pins first in their folders and Global Pins above folders", () => {
+  const normal = { id: "normal", globallyPinned: false };
+  const global = { id: "global", globallyPinned: true };
+  const active = { id: "active", globallyPinned: false };
+  const placed = placeSidebarPins([normal, global], [active]);
+  const grouped = groupThreadsBySidebarFolder({
+    threads: placed.activeThreads,
+    folders: [{ id: "work", name: "Work", collapsed: false }],
+    folderIdByThreadKey: { normal: "work", global: "work", active: "work" },
+    keyOf: (thread) => thread.id,
+  });
+  expect(placed.pinnedThreads).toEqual([global]);
+  expect(grouped.folders[0]?.threads).toEqual([normal, active]);
+  expect(grouped.unfiled).toEqual([]);
+});
+
+it("reorders regular pins within a folder without unpinning or moving ordinary rows", () => {
+  const plan = planSidebarThreadDrop({
+    activeKey: "p2",
+    activeSection: "active",
+    folderPinned: true,
+    target: { section: "active", pinnedOrder: [], activeOrder: ["p2", "p1", "loose"] },
+    pinnedOrder: ["p1", "p2"],
+    pinnedKeysById: new Map([
+      ["p1", "m"],
+      ["p2", "z"],
+    ]),
+    activeOrder: ["p1", "p2", "loose"],
+    activeKeysById: new Map(),
+    activeTimeOrdered: true,
+  });
+  expect(plan.kind).toBe("reorder-pinned");
+  if (plan.kind !== "reorder-pinned") throw new Error("Expected pin reorder");
+  expect(plan.order).toEqual(["p2", "p1"]);
+  expect(plan.assignments).toHaveLength(1);
+  expect(plan.assignments[0]?.id).toBe("p2");
+  expect(plan.assignments[0]!.orderKey < "m").toBe(true);
 });

@@ -186,6 +186,22 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
       );
       const { sidebarFolders } = yield* service.getSettings;
       assert.deepEqual(sidebarFolders[0]?.threadIds.toSorted(), threadIds);
+      yield* service.updateSidebarFolders({ action: "create", folderId: "home", name: "Home" });
+      yield* service.updateSidebarFolders({
+        action: "reorder",
+        folderId: "home",
+        beforeFolderId: "work",
+      });
+      const reordered = yield* service.getSettings;
+      assert.deepEqual(
+        reordered.sidebarFolders.map((folder) => folder.id),
+        ["home", "work"],
+      );
+      assert.deepEqual(reordered.sidebarFolders[1]?.threadIds.toSorted(), threadIds);
+      const config = yield* ServerConfig.ServerConfig;
+      const fs = yield* FileSystem.FileSystem;
+      const saved = yield* decodeServerSettingsJson(yield* fs.readFileString(config.settingsPath));
+      assert.deepEqual(saved.sidebarFolders, reordered.sidebarFolders);
     }).pipe(Effect.provide(layerServerSettings())),
   );
   it.effect("persists and broadcasts model preferences to other connected clients", () =>

@@ -423,7 +423,11 @@ describe("thread action undo", () => {
       "pin",
       "snooze",
     ]);
-    expect(state.requests[2]?.input).toEqual({ threadId: thread.id, orderKey: "m" });
+    expect(state.requests[2]?.input).toEqual({
+      threadId: thread.id,
+      orderKey: "m",
+      globallyPinned: false,
+    });
     expect(state.requests[3]?.input).toEqual({
       threadId: thread.id,
       snoozedUntil: thread.snoozedUntil,

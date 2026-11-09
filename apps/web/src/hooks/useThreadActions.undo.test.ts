@@ -147,7 +147,7 @@ describe("unpin Undo", () => {
     await currentUndo()();
     expect(commands.pin).toHaveBeenCalledExactlyOnceWith({
       environmentId: target.environmentId,
-      input: { threadId: target.threadId, orderKey: "a0" },
+      input: { threadId: target.threadId, orderKey: "a0", globallyPinned: false },
     });
     expect(commands.snooze).toHaveBeenCalledExactlyOnceWith({
       environmentId: target.environmentId,
@@ -181,7 +181,7 @@ describe("unpin Undo", () => {
     expect(commands.pin).toHaveBeenCalledTimes(2);
     expect(commands.pin).toHaveBeenLastCalledWith({
       environmentId: target.environmentId,
-      input: { threadId: target.threadId, orderKey: "a0" },
+      input: { threadId: target.threadId, orderKey: "a0", globallyPinned: false },
     });
     await latestUndo();
     expect(commands.pin).toHaveBeenCalledTimes(2);
@@ -262,7 +262,7 @@ describe("settle and snooze Undo", () => {
     expect(commands.unsettle).toHaveBeenCalledOnce();
     expect(commands.pin).toHaveBeenCalledExactlyOnceWith({
       environmentId: target.environmentId,
-      input: { threadId: target.threadId, orderKey: "a0" },
+      input: { threadId: target.threadId, orderKey: "a0", globallyPinned: false },
     });
     expect(commands.snooze).toHaveBeenCalledExactlyOnceWith({
       environmentId: target.environmentId,

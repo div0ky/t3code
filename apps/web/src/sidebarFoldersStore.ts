@@ -33,6 +33,7 @@ interface SidebarFoldersStore {
   readonly folderIdByThreadKey: Readonly<Record<string, string>>;
   readonly environmentIdByFolderId: Readonly<Record<string, EnvironmentId>>;
   readonly createFolder: (environmentId: EnvironmentId | null) => string | null;
+  readonly reorderFolder: (folderId: string, direction: "up" | "down") => void;
   readonly renameFolder: (folderId: string, name: string) => void;
   readonly toggleFolder: (folderId: string) => void;
   readonly deleteFolder: (folderId: string) => void;
@@ -207,6 +208,21 @@ export const useSidebarFoldersStore = create<SidebarFoldersStore>((_set, get) =>
     return dispatchUserAction(target, { action: "create", folderId, name: "New folder" })
       ? folderId
       : null;
+  },
+  reorderFolder: (folderId, direction) => {
+    const environmentId = get().environmentIdByFolderId[folderId];
+    if (environmentId === undefined) return;
+    const folders = get().folders.filter(
+      (folder) => get().environmentIdByFolderId[folder.id] === environmentId,
+    );
+    const index = folders.findIndex((folder) => folder.id === folderId);
+    const target = index + (direction === "up" ? -1 : 1);
+    if (index < 0 || target < 0 || target >= folders.length) return;
+    dispatchUserAction(environmentId, {
+      action: "reorder",
+      folderId,
+      beforeFolderId: direction === "up" ? folders[target]!.id : (folders[target + 1]?.id ?? null),
+    });
   },
   renameFolder: (folderId, name) => {
     const environmentId = get().environmentIdByFolderId[folderId];

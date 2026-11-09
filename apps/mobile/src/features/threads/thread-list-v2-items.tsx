@@ -654,7 +654,11 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
   readonly onUnsnoozeThread: (thread: EnvironmentThreadShell) => void;
   readonly onUnsettleThread: (thread: EnvironmentThreadShell) => void;
   readonly onArchiveThread: (thread: EnvironmentThreadShell) => void;
-  readonly onPinThread: (thread: EnvironmentThreadShell) => void;
+  readonly onPinThread: (
+    thread: EnvironmentThreadShell,
+    orderKey?: string,
+    globallyPinned?: boolean,
+  ) => void;
   readonly onUnpinThread: (thread: EnvironmentThreadShell) => void;
   readonly onSetThreadAutoSettle: (thread: EnvironmentThreadShell, enabled: boolean) => void;
   readonly settlementSupported: boolean;
@@ -789,6 +793,10 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
   const handleUnsnooze = useCallback(() => onUnsnoozeThread(thread), [onUnsnoozeThread, thread]);
   const handleUnsettle = useCallback(() => onUnsettleThread(thread), [onUnsettleThread, thread]);
   const handlePin = useCallback(() => onPinThread(thread), [onPinThread, thread]);
+  const handleGlobalPin = useCallback(
+    () => onPinThread(thread, undefined, !thread.globallyPinned),
+    [onPinThread, thread],
+  );
   const handleUnpin = useCallback(() => onUnpinThread(thread), [onUnpinThread, thread]);
   const handleSetAutoSettle = useCallback(
     (enabled: boolean) => onSetThreadAutoSettle(thread, enabled),
@@ -859,9 +867,14 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
             thread.pinnedAt != null
               ? { id: "unpin", title: "Unpin", image: "pin.slash" }
               : { id: "pin", title: "Pin", image: "pin" },
+            {
+              id: "global-pin",
+              title: thread.globallyPinned ? "Pin" : "Pin Globally",
+              image: "pin.fill",
+            },
           ]
         : [],
-    [props.pinningSupported, thread.pinnedAt],
+    [props.pinningSupported, thread.pinnedAt, thread.globallyPinned],
   );
   const autoSettleMenuItems = useMemo<MenuAction[]>(
     () =>
@@ -1000,6 +1013,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
       if (nativeEvent.event === "unsettle") handleUnsettle();
       if (nativeEvent.event === "unsnooze") handleUnsnooze();
       if (nativeEvent.event === "pin") handlePin();
+      if (nativeEvent.event === "global-pin") handleGlobalPin();
       if (nativeEvent.event === "unpin") handleUnpin();
       if (nativeEvent.event === "auto-settle:enabled") handleSetAutoSettle(true);
       if (nativeEvent.event === "auto-settle:disabled") handleSetAutoSettle(false);
@@ -1052,6 +1066,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
       handleMoveDown,
       handleMoveUp,
       handlePin,
+      handleGlobalPin,
       handleSettle,
       handleSnooze,
       handleSetAutoSettle,

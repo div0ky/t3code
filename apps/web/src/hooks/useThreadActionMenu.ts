@@ -139,6 +139,7 @@ export function useThreadActionMenu(input: {
         branch: thread.branch ?? null,
         projectFilter: null,
         isPinned: thread.pinnedAt != null,
+        isGloballyPinned: thread.globallyPinned === true,
         isSettled: supports.settlement && thread.settledOverride === "settled",
         autoSettleEnabled: thread.autoSettleDisabledAt == null,
         isSnoozed: supports.snooze && effectiveSnoozed(thread, { now: now.toISOString() }),
@@ -231,6 +232,12 @@ export function useThreadActionMenu(input: {
         case "unsnooze":
           await reportFailure("Failed to wake thread", () => unsnoozeThread(threadRef));
           return;
+        case "global-pin":
+          await reportFailure("Failed to Pin Globally thread", () =>
+            pinThread(threadRef, { globallyPinned: true }),
+          );
+          return;
+        case "folder-pin":
         case "pin":
           await reportFailure("Failed to pin thread", () => pinThread(threadRef));
           return;

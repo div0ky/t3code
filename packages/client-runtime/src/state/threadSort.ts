@@ -270,6 +270,7 @@ export function sortPinnedThreadsByOrderKey<
     readonly id: string;
     readonly createdAt: string;
     readonly pinOrderKey?: string | null | undefined;
+    readonly globallyPinned?: boolean;
     /** Thread ids are only unique within an environment, and the pinned
         block merges environments — the tiebreak needs both parts or two
         clients could render equal-key threads in stream-arrival order. */
@@ -297,7 +298,9 @@ export function sortPinnedThreadsByOrderKey<
     (left, right) =>
       timestamps.get(right)! - timestamps.get(left)! || identityTiebreak(left, right),
   );
-  return [...keyed, ...keyless];
+  return [...keyed, ...keyless].sort(
+    (left, right) => Number(right.globallyPinned === true) - Number(left.globallyPinned === true),
+  );
 }
 
 export function sortActiveThreadsByOrderKey<

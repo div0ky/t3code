@@ -487,6 +487,7 @@ export const OrchestrationV2AppThread = Schema.Struct({
   limitRecovery: Schema.optional(Schema.NullOr(OrchestrationV2LimitRecovery)),
   guestShare: Schema.optional(Schema.NullOr(ThreadGuestShare)),
   pinnedAt: Schema.optional(Schema.NullOr(Schema.DateTimeUtc)),
+  globallyPinned: Schema.optional(Schema.Boolean),
   autoSettleDisabledAt: Schema.optional(Schema.NullOr(Schema.DateTimeUtc)),
   pinOrderKey: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
   activeOrderKey: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
@@ -2156,6 +2157,7 @@ export const OrchestrationV2ThreadShell = Schema.Struct({
   snoozedAt: Schema.optional(Schema.NullOr(Schema.DateTimeUtc)),
   limitRecovery: Schema.optional(Schema.NullOr(OrchestrationV2LimitRecovery)),
   pinnedAt: Schema.optional(Schema.NullOr(Schema.DateTimeUtc)),
+  globallyPinned: Schema.optional(Schema.Boolean),
   autoSettleDisabledAt: Schema.optional(Schema.NullOr(Schema.DateTimeUtc)),
   pinOrderKey: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
   activeOrderKey: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
@@ -3034,6 +3036,7 @@ export const OrchestrationV2Command = Schema.Union([
     type: Schema.Literal("thread.pin"),
     commandId: CommandId,
     threadId: ThreadId,
+    globallyPinned: Schema.optional(Schema.Boolean),
     orderKey: Schema.optional(TrimmedNonEmptyString),
   }),
   Schema.Struct({

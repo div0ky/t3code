@@ -289,6 +289,7 @@ describe("getThreadListV2OrderedSection", () => {
       makeThread({ id: ThreadId.make("active-new"), title: "New" }),
       makeThread({
         id: ThreadId.make("pinned-later"),
+        globallyPinned: true,
         title: "Pinned later",
         pinnedAt: NOW,
         pinOrderKey: "t",
@@ -326,7 +327,7 @@ describe("getThreadListV2OrderedSection", () => {
       getThreadListV2OrderedSection({ threads, section: "pinned", now: NOW }).map(
         (thread) => thread.id,
       ),
-    ).toEqual(["pinned-first", "pinned-later"]);
+    ).toEqual(["pinned-later", "pinned-first"]);
   });
 });
 

@@ -3808,6 +3808,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
             pullRequests: thread.pullRequests?.map((link) => withPullRequestWatch(link, undefined)),
             unsettledAt: null,
             pinnedAt: null,
+            globallyPinned: false,
             pinOrderKey: null,
             activeOrderKey: null,
             snoozedUntil: null,
@@ -3859,10 +3860,14 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         case "thread.pin": {
           const alreadyPinned = thread.pinnedAt != null;
           const promotes = thread.settledOverride === "settled" || thread.snoozedUntil != null;
+          const globallyPinned =
+            command.globallyPinned ?? (alreadyPinned && thread.globallyPinned === true);
+          const scopeChanged = globallyPinned !== (thread.globallyPinned ?? false);
           return {
             ...thread,
             pinnedAt: alreadyPinned ? thread.pinnedAt : now,
-            ...(alreadyPinned || command.orderKey === undefined
+            globallyPinned,
+            ...((alreadyPinned && !scopeChanged) || command.orderKey === undefined
               ? {}
               : { pinOrderKey: command.orderKey }),
             settledOverride:
@@ -3872,7 +3877,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
             snoozedUntil: null,
             snoozedAt: null,
             lastSnoozeWakeAt: thread.snoozedUntil == null ? thread.lastSnoozeWakeAt : now,
-            updatedAt: alreadyPinned && !promotes ? thread.updatedAt : now,
+            updatedAt: alreadyPinned && !promotes && !scopeChanged ? thread.updatedAt : now,
           };
         }
         case "thread.unpin": {
@@ -3880,6 +3885,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           return {
             ...thread,
             pinnedAt: null,
+            globallyPinned: false,
             pinOrderKey: null,
             updatedAt: alreadyUnpinned ? thread.updatedAt : now,
           };

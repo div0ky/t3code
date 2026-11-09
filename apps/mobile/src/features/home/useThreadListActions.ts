@@ -196,7 +196,11 @@ export function useThreadListActions(): {
   readonly snoozeThread: (thread: EnvironmentThreadShell, snoozedUntil: string) => Promise<boolean>;
   readonly unsnoozeThread: (thread: EnvironmentThreadShell) => Promise<boolean>;
   readonly unsettleThread: (thread: EnvironmentThreadShell) => Promise<boolean>;
-  readonly pinThread: (thread: EnvironmentThreadShell) => Promise<boolean>;
+  readonly pinThread: (
+    thread: EnvironmentThreadShell,
+    restoreOrderKey?: string,
+    globallyPinned?: boolean,
+  ) => Promise<boolean>;
   readonly unpinThread: (thread: EnvironmentThreadShell) => Promise<boolean>;
   readonly setThreadAutoSettle: (
     thread: EnvironmentThreadShell,
@@ -244,7 +248,7 @@ export function useThreadListActions(): {
                 case "unsnooze":
                   return unsnoozeThread(thread);
                 case "pin":
-                  return pinThread(thread, step.orderKey);
+                  return pinThread(thread, step.orderKey, step.globallyPinned);
                 case "snooze": {
                   const failureTitle =
                     action === "Unpinned" ? "Could not undo unpin" : "Could not undo settle";
@@ -390,13 +394,25 @@ export function useThreadListActions(): {
   };
   const unsettleThread = async (thread: EnvironmentThreadShell) =>
     (await executeAction("unsettle", thread)) === true;
-  const pinThread = async (thread: EnvironmentThreadShell, restoreOrderKey?: string) => {
+  const pinThread = async (
+    thread: EnvironmentThreadShell,
+    restoreOrderKey?: string,
+    globallyPinned = false,
+  ) => {
     if (!checkThreadOperationPermission(thread, "Could not pin thread")) return false;
     if (!environmentConfigLoaded(thread.environmentId)) {
       Dialog.alert(
         "Could not pin thread",
         "This environment's server does not support pinning yet. Update the server to use Pin.",
       );
+      return false;
+    }
+    if (
+      globallyPinned &&
+      appAtomRegistry.get(environmentServerConfigsAtom).get(thread.environmentId)?.environment
+        .capabilities.threadGlobalPinning !== true
+    ) {
+      Dialog.alert("Could not pin globally", "Update this environment's server to pin globally.");
       return false;
     }
     selectionHaptic();
@@ -416,7 +432,11 @@ export function useThreadListActions(): {
       () =>
         pinMutation({
           environmentId: thread.environmentId,
-          input: { threadId: thread.id, ...(orderKey !== undefined ? { orderKey } : {}) },
+          input: {
+            threadId: thread.id,
+            globallyPinned,
+            ...(orderKey !== undefined ? { orderKey } : {}),
+          },
         }),
       (result) => result._tag === "Success",
     );

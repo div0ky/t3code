@@ -38,7 +38,7 @@ export function invalidate(kind: string, threadKey: string) {
 export type ThreadUndoStep =
   | { readonly action: "unsettle" }
   | { readonly action: "unsnooze" }
-  | { readonly action: "pin"; readonly orderKey?: string }
+  | { readonly action: "pin"; readonly orderKey?: string; readonly globallyPinned?: boolean }
   | { readonly action: "snooze"; readonly snoozedUntil: string };
 
 export type ThreadUndoPlan = readonly [ThreadUndoStep, ...ThreadUndoStep[]];
@@ -47,6 +47,7 @@ export function planThreadUndo(
   action: "settle" | "snooze" | "unpin",
   thread?: {
     readonly pinnedAt?: string | null;
+    readonly globallyPinned?: boolean;
     readonly pinOrderKey?: string | null;
     readonly snoozedUntil?: string | null;
   } | null,
@@ -54,6 +55,7 @@ export function planThreadUndo(
   if (action === "snooze") return [{ action: "unsnooze" }];
   const pin: ThreadUndoStep = {
     action: "pin",
+    ...(thread?.globallyPinned ? { globallyPinned: true } : {}),
     ...(thread?.pinOrderKey != null ? { orderKey: thread.pinOrderKey } : {}),
   };
   // Pinning clears snooze on the server; restore it after restoring pin placement.
