@@ -27,3 +27,14 @@ describe("thread action ownership", () => {
     otherThread.finish();
   });
 });
+
+it("restores Pin Globally placement when undoing unpin or settle", () => {
+  const thread = { pinnedAt: "2026-11-09T00:00:00Z", pinOrderKey: "a0", globallyPinned: true };
+  for (const action of ["unpin", "settle"] as const) {
+    expect(ThreadUndo.planThreadUndo(action, thread)).toContainEqual({
+      action: "pin",
+      orderKey: "a0",
+      globallyPinned: true,
+    });
+  }
+});

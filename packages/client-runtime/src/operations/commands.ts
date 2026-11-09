@@ -97,6 +97,7 @@ export interface UnsettleThreadInput extends ThreadCommandInput {
 }
 
 export interface PinThreadInput extends ThreadCommandInput {
+  readonly globallyPinned?: boolean;
   readonly orderKey?: string;
 }
 export type UnpinThreadInput = ThreadCommandInput;
@@ -503,6 +504,7 @@ export const pinThread = Effect.fn("EnvironmentCommands.pinThread")(function* (
   const commandId = yield* allocateCommandId(input);
   return yield* dispatch({
     type: "thread.pin",
+    ...(input.globallyPinned === undefined ? {} : { globallyPinned: input.globallyPinned }),
     commandId,
     threadId: input.threadId,
     ...(input.orderKey === undefined ? {} : { orderKey: input.orderKey }),

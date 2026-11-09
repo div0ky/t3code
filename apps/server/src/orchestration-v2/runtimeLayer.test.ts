@@ -2727,10 +2727,36 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
         type: "thread.pin",
         commandId: CommandId.make("runtime-layer-lifecycle-pin-settled"),
         threadId,
+        orderKey: "z",
       });
       const pinnedProjection = yield* orchestrator.getThreadProjection(threadId);
       assert.equal(pinnedProjection.thread.settledOverride, "active");
       assert.isNotNull(pinnedProjection.thread.unsettledAt);
+
+      yield* orchestrator.dispatch({
+        type: "thread.pin",
+        commandId: CommandId.make("runtime-layer-lifecycle-global-pin"),
+        threadId,
+        globallyPinned: true,
+        orderKey: "g",
+      });
+      assert.isTrue((yield* orchestrator.getThreadShell(threadId))?.globallyPinned);
+      assert.equal((yield* orchestrator.getThreadShell(threadId))?.pinOrderKey, "g");
+      yield* orchestrator.dispatch({
+        type: "thread.pin",
+        commandId: CommandId.make("runtime-layer-lifecycle-repeat-global-pin"),
+        threadId,
+        globallyPinned: true,
+        orderKey: "h",
+      });
+      assert.equal((yield* orchestrator.getThreadShell(threadId))?.pinOrderKey, "g");
+      yield* orchestrator.dispatch({
+        type: "thread.pin",
+        commandId: CommandId.make("runtime-layer-lifecycle-normal-pin"),
+        threadId,
+        globallyPinned: false,
+      });
+      assert.isFalse((yield* orchestrator.getThreadShell(threadId))?.globallyPinned);
 
       const archive = yield* orchestrator.dispatch({
         type: "thread.archive",

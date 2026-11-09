@@ -578,6 +578,27 @@ describe("applySidebarFolderOperation", () => {
     ).toBe(folders);
   });
 
+  it("reorders folders without losing threads and safely replays the move", () => {
+    const move = { action: "reorder" as const, folderId: "home", beforeFolderId: "work" };
+    const reordered = applySidebarFolderOperation(folders, move);
+    expect(reordered).toEqual([folders[1], folders[0]]);
+    expect(applySidebarFolderOperation(reordered, move)).toEqual(reordered);
+    expect(
+      applySidebarFolderOperation(reordered, {
+        action: "reorder",
+        folderId: "home",
+        beforeFolderId: null,
+      }),
+    ).toEqual(folders);
+    expect(
+      applySidebarFolderOperation(folders, {
+        action: "reorder",
+        folderId: "home",
+        beforeFolderId: "deleted",
+      }),
+    ).toBe(folders);
+  });
+
   it("does not duplicate a folder when create is retried", () => {
     expect(
       applySidebarFolderOperation(folders, { action: "create", folderId: "work", name: "Again" }),

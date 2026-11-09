@@ -488,7 +488,7 @@ const dropVerbBadge: Record<SidebarDropVerb, ReactNode> = {
   pin: (
     <>
       <PinIcon aria-hidden className="size-3" />
-      Pin
+      Pin Globally
     </>
   ),
   unpin: (

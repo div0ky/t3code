@@ -727,7 +727,10 @@ export function useThreadActions() {
     });
   };
 
-  const pinThread = async (target: ScopedThreadRef, opts: { orderKey?: string } = {}) => {
+  const pinThread = async (
+    target: ScopedThreadRef,
+    opts: { orderKey?: string | undefined; globallyPinned?: boolean | undefined } = {},
+  ) => {
     if (!readEnvironmentServerConfigLoaded(target.environmentId)) {
       return AsyncResult.failure(
         Cause.fail(
@@ -736,6 +739,15 @@ export function useThreadActions() {
             threadId: target.threadId,
           }),
         ),
+      );
+    }
+    if (
+      opts.globallyPinned &&
+      appAtomRegistry.get(environmentServerConfigsAtom).get(target.environmentId)?.environment
+        .capabilities.threadGlobalPinning !== true
+    ) {
+      return AsyncResult.failure(
+        Cause.fail(new Error("Update this environment's server to pin globally.")),
       );
     }
     const orderKey = opts.orderKey ?? topOfPinnedRunOrderKey();
@@ -748,6 +760,7 @@ export function useThreadActions() {
       input: {
         threadId: target.threadId,
         ...(orderKey !== undefined ? { orderKey } : {}),
+        globallyPinned: opts.globallyPinned ?? false,
       },
     });
   };
@@ -947,10 +960,10 @@ export function useThreadActions() {
           case "unsnooze":
             return unsnoozeThread(target);
           case "pin":
-            return pinThread(
-              target,
-              step.orderKey === undefined ? {} : { orderKey: step.orderKey },
-            );
+            return pinThread(target, {
+              orderKey: step.orderKey,
+              globallyPinned: step.globallyPinned,
+            });
           case "snooze":
             return snoozeThreadMutation({
               environmentId: target.environmentId,

@@ -234,7 +234,7 @@ function sectionAtSidebarSlot(items: readonly SidebarListItem[], index: number):
   return section;
 }
 
-type SidebarDropTarget = {
+export type SidebarDropTarget = {
   readonly section: "pinned" | "active" | "settled";
   readonly pinnedOrder: readonly string[];
   readonly activeOrder: readonly string[];
@@ -322,8 +322,14 @@ export function resolveFolderDropOrder<T extends SidebarDropTarget>(
   target: T,
   serverOrder: readonly string[],
   activeKey: string,
+  excludedKeys?: ReadonlySet<string>,
 ): T {
-  if (target.section !== "active" || target.activeSlots.length === 0) return target;
+  if (target.section !== "active") return target;
+  if (target.activeSlots.length === 0)
+    return {
+      ...target,
+      activeOrder: target.activeOrder.filter((key) => !excludedKeys?.has(key)),
+    };
   const position = target.folderSiblings.indexOf(activeKey);
   const next = target.folderSiblings[position + 1];
   const previous = target.folderSiblings[position - 1];
@@ -335,7 +341,17 @@ export function resolveFolderDropOrder<T extends SidebarDropTarget>(
         ? order.indexOf(previous) + 1
         : -1;
   order.splice(anchor === -1 ? Math.max(serverOrder.indexOf(activeKey), 0) : anchor, 0, activeKey);
-  return { ...target, activeOrder: order };
+  return { ...target, activeOrder: order.filter((key) => !excludedKeys?.has(key)) };
+}
+
+export function placeSidebarPins<T extends { readonly globallyPinned?: boolean }>(
+  pinned: readonly T[],
+  active: readonly T[],
+) {
+  return {
+    pinnedThreads: pinned.filter((thread) => thread.globallyPinned === true),
+    activeThreads: [...pinned.filter((thread) => thread.globallyPinned !== true), ...active],
+  };
 }
 
 export function groupThreadsBySidebarFolder<T>(input: {
@@ -446,6 +462,7 @@ export function resolveSidebarReorderableThreadKeys(input: {
 }
 
 export function planSidebarThreadDrop(input: {
+  readonly folderPinned?: boolean;
   readonly activeKey: string;
   readonly activeSection: SidebarSection;
   readonly activePinned?: boolean;
@@ -462,10 +479,8 @@ export function planSidebarThreadDrop(input: {
 }): SidebarThreadDropPlan {
   const {
     activeKey,
-    activeSection,
-    activePinned = activeSection === "pinned",
-    activeSettled = activeSection === "settled",
-    target,
+    activePinned = input.activeSection === "pinned",
+    activeSettled = input.activeSection === "settled",
     pinnedOrder,
     pinnedKeysById,
     reorderableKeys,
@@ -473,6 +488,16 @@ export function planSidebarThreadDrop(input: {
     activeKeysById,
     activeReorderableKeys,
   } = input;
+  const folderPinned =
+    input.folderPinned && input.activeSection === "active" && input.target.section === "active";
+  const activeSection = folderPinned ? "pinned" : input.activeSection;
+  const target = folderPinned
+    ? {
+        ...input.target,
+        section: "pinned" as const,
+        pinnedOrder: input.target.activeOrder.filter((key) => pinnedKeysById.has(key)),
+      }
+    : input.target;
   if (activeSection === "working") return { kind: "none" };
   if (input.supportsSettlement === false && (target.section === "settled" || activeSettled)) {
     return { kind: "none" };

@@ -7,6 +7,8 @@ export type ThreadActionMenuId =
   | "filter-by-project"
   | "turn-into-project"
   | "project-settings"
+  | "global-pin"
+  | "folder-pin"
   | "pin"
   | "unpin"
   | "settle"
@@ -76,6 +78,7 @@ export interface ThreadActionMenuState {
     readonly isActive: boolean;
   } | null;
   readonly isPinned: boolean;
+  readonly isGloballyPinned?: boolean;
   readonly isSettled: boolean;
   readonly autoSettleEnabled: boolean;
   readonly isSnoozed: boolean;
@@ -133,7 +136,10 @@ export function buildThreadActionMenuItems(
       ? [
           state.isPinned
             ? { id: "unpin" as const, label: "Unpin thread", icon: "pin-off" }
-            : { id: "pin" as const, label: "Pin thread", icon: "pin" },
+            : { id: "pin" as const, label: "Pin", icon: "pin" },
+          state.isGloballyPinned
+            ? { id: "folder-pin" as const, label: "Pin", icon: "pin" }
+            : { id: "global-pin" as const, label: "Pin Globally", icon: "pin" },
         ]
       : []),
     ...(state.supports.settlement
