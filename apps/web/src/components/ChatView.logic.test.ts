@@ -6,6 +6,8 @@ import {
   snapshotComposerSend,
   withMessageContext,
   deriveAvailableRevertTurnCounts,
+  deriveThreadTasks,
+  windowTaskSteps,
 } from "./ChatView.logic";
 import { recallCheckoutIsRepo, rememberCheckoutIsRepo } from "./ChatView.logic";
 import { ProviderDriverKind, type ServerProvider } from "@t3tools/contracts";
@@ -16,6 +18,8 @@ import {
   CommandId,
   EnvironmentId,
   MessageId,
+  NodeId,
+  PlanId,
   ProjectId,
   PROVIDER_SEND_TURN_MAX_ATTACHMENTS,
   ProviderInstanceId,
@@ -1214,5 +1218,143 @@ describe("deriveAvailableRevertTurnCounts", () => {
   it("offers nothing without a provider session to rewind", () => {
     expect(deriveAvailableRevertTurnCounts(projection({ providerSessionId: null })).size).toBe(0);
     expect(deriveAvailableRevertTurnCounts(null).size).toBe(0);
+  });
+});
+
+describe("deriveThreadTasks", () => {
+  const base = makeThreadProjectionFixture();
+
+  function providerThread(id: string, driver: string) {
+    return {
+      id: ProviderThreadId.make(id),
+      driver: ProviderDriverKind.make(driver),
+      providerInstanceId: ProviderInstanceId.make(driver),
+      providerSessionId: null,
+      appThreadId: base.thread.id,
+      ownerNodeId: null,
+      nativeThreadRef: null,
+      nativeConversationHeadRef: null,
+      status: "idle" as const,
+      firstRunOrdinal: null,
+      lastRunOrdinal: null,
+      handoffIds: [],
+      forkedFrom: null,
+      createdAt: base.updatedAt,
+      updatedAt: base.updatedAt,
+    };
+  }
+
+  function run(ordinal: number, providerThreadId: string, status: "completed" | "running") {
+    return {
+      id: RunId.make(`run-${ordinal}`),
+      threadId: base.thread.id,
+      ordinal,
+      providerInstanceId: base.thread.providerInstanceId,
+      modelSelection: base.thread.modelSelection,
+      providerThreadId: ProviderThreadId.make(providerThreadId),
+      userMessageId: MessageId.make(`message-${ordinal}`),
+      rootNodeId: null,
+      activeAttemptId: null,
+      status,
+      requestedAt: base.updatedAt,
+      startedAt: base.updatedAt,
+      completedAt: status === "completed" ? base.updatedAt : null,
+      checkpointId: null,
+      contextHandoffId: null,
+    };
+  }
+
+  function todoList(ordinal: number, statuses: ReadonlyArray<"pending" | "running" | "completed">) {
+    return {
+      id: PlanId.make(`plan-${ordinal}`),
+      threadId: base.thread.id,
+      runId: RunId.make(`run-${ordinal}`),
+      nodeId: NodeId.make(`node-${ordinal}`),
+      kind: "todo_list" as const,
+      status: "active" as const,
+      steps: statuses.map((status, index) => ({ id: `${index}`, text: `Step ${index}`, status })),
+    };
+  }
+
+  it.each(["claudeAgent", "codex"])(
+    "shows %s tasks while their run works and keeps unfinished ones only for Claude",
+    (driver) => {
+      const open = todoList(1, ["completed", "running", "pending"]);
+      const settled = {
+        ...base,
+        providerThreads: [providerThread(driver, driver)],
+        runs: [run(1, driver, "completed")],
+        plans: [open],
+      };
+      const running = { ...settled, runs: [run(1, driver, "running")] };
+      const runId = RunId.make("run-1");
+      expect(deriveThreadTasks(running, runId, false)).toEqual({ steps: open.steps, live: true });
+
+      const allDone = { ...settled, plans: [todoList(1, ["completed", "completed"])] };
+      expect(deriveThreadTasks({ ...allDone, runs: running.runs }, runId, false)?.live).toBe(true);
+      expect(deriveThreadTasks(allDone, runId, true)).toBeNull();
+
+      const retained = driver === "claudeAgent" ? { steps: open.steps, live: false } : null;
+      expect(deriveThreadTasks(settled, runId, true)).toEqual(retained);
+      const nextTurn = { ...settled, runs: [...settled.runs, run(2, driver, "running")] };
+      expect(deriveThreadTasks(nextTurn, RunId.make("run-2"), false)).toEqual(retained);
+    },
+  );
+
+  it("drops retained Claude tasks once another provider session starts, and skips superseded lists", () => {
+    const settled = {
+      ...base,
+      providerThreads: [providerThread("claude", "claudeAgent"), providerThread("next", "codex")],
+      runs: [run(1, "claude", "completed")],
+      plans: [todoList(1, ["pending"])],
+    };
+    const queued = { ...run(2, "next", "running"), status: "queued" as const, startedAt: null };
+    const runId = RunId.make("run-2");
+    expect(
+      deriveThreadTasks({ ...settled, runs: [...settled.runs, queued] }, runId, false),
+    ).not.toBeNull();
+    expect(
+      deriveThreadTasks(
+        { ...settled, runs: [...settled.runs, run(2, "next", "running")] },
+        runId,
+        false,
+      ),
+    ).toBeNull();
+    expect(
+      deriveThreadTasks(
+        { ...settled, plans: [{ ...todoList(1, ["pending"]), status: "superseded" as const }] },
+        RunId.make("run-1"),
+        true,
+      ),
+    ).toBeNull();
+  });
+});
+
+describe("windowTaskSteps", () => {
+  it("keeps a long list to the steps around the current one", () => {
+    const steps = Array.from({ length: 20 }, (_, index) => ({
+      status:
+        index < 10
+          ? ("completed" as const)
+          : index === 10
+            ? ("running" as const)
+            : ("pending" as const),
+    }));
+    expect(windowTaskSteps(steps.slice(0, 5), 12)).toMatchObject({
+      hiddenBefore: 0,
+      hiddenAfter: 0,
+    });
+    const windowed = windowTaskSteps(steps, 12);
+    expect(windowed).toMatchObject({ hiddenBefore: 8, hiddenAfter: 0 });
+    expect(windowed.visible).toHaveLength(12);
+    expect(
+      windowTaskSteps(
+        steps.map(() => ({ status: "pending" as const })),
+        12,
+      ),
+    ).toMatchObject({
+      hiddenBefore: 0,
+      hiddenAfter: 8,
+    });
   });
 });
