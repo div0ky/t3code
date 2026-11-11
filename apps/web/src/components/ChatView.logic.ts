@@ -1,4 +1,8 @@
-import { type OrchestrationV2ProviderTurn, type RunAttemptId } from "@t3tools/contracts";
+import {
+  type OrchestrationV2PlanStep,
+  type OrchestrationV2ProviderTurn,
+  type RunAttemptId,
+} from "@t3tools/contracts";
 import {
   deriveLatestThreadRun,
   deriveThreadRuntime,
@@ -1450,6 +1454,79 @@ export function presentThreadShellFromProjection(
     }),
     latestRun,
     runtime,
+  };
+}
+
+export interface ThreadTasksState {
+  readonly steps: ReadonlyArray<OrchestrationV2PlanStep>;
+  /** The run that wrote the list is still working. */
+  readonly live: boolean;
+}
+
+/** The todo list to pin at the end of the timeline, or null when none is in play. */
+export function deriveThreadTasks(
+  projection: ThreadStructure | null,
+  activeRunId: RunId | null,
+  activeRunSettled: boolean,
+): ThreadTasksState | null {
+  if (projection === null) return null;
+  const runs = new Map(projection.runs.map((run) => [run.id, run]));
+  const ordinalOf = (runId: RunId | null) =>
+    runId === null ? -1 : (runs.get(runId)?.ordinal ?? -1);
+  const plans = projection.plans
+    .filter((plan) => plan.kind === "todo_list")
+    .filter((plan) => plan.status !== "superseded");
+  const plan =
+    plans.findLast((candidate) => candidate.runId === activeRunId) ??
+    plans.reduce<(typeof plans)[number] | null>(
+      (latest, candidate) =>
+        latest === null || ordinalOf(candidate.runId) >= ordinalOf(latest.runId)
+          ? candidate
+          : latest,
+      null,
+    );
+  if (plan === null || plan.steps.length === 0) return null;
+  if (activeRunId !== null && !activeRunSettled && plan.runId === activeRunId) {
+    return { steps: plan.steps, live: true };
+  }
+  if (plan.steps.every((step) => step.status === "completed")) return null;
+  // Claude's unfinished tasks belong to the provider session, not just the turn.
+  const providerThreadId =
+    plan.runId === null ? null : (runs.get(plan.runId)?.providerThreadId ?? null);
+  if (providerThreadId === null) return null;
+  const driver = projection.providerThreads.find(
+    (thread) => thread.id === providerThreadId,
+  )?.driver;
+  if (driver !== "claudeAgent") return null;
+  const latestStartedRun = projection.runs.reduce<(typeof projection.runs)[number] | null>(
+    (latest, run) =>
+      run.startedAt !== null &&
+      run.providerThreadId !== null &&
+      (latest === null || run.ordinal > latest.ordinal)
+        ? run
+        : latest,
+    null,
+  );
+  return latestStartedRun?.providerThreadId === providerThreadId
+    ? { steps: plan.steps, live: false }
+    : null;
+}
+
+/** The steps around the current one, so a long list stays a short card. */
+export function windowTaskSteps<Step extends Pick<OrchestrationV2PlanStep, "status">>(
+  steps: ReadonlyArray<Step>,
+  max: number,
+) {
+  if (steps.length <= max) return { visible: steps, hiddenBefore: 0, hiddenAfter: 0 };
+  const running = steps.findIndex((step) => step.status === "running");
+  const pending = steps.findIndex((step) => step.status === "pending");
+  const current = running >= 0 ? running : pending >= 0 ? pending : steps.length - 1;
+  // Two finished steps stay above the current one for context.
+  const start = Math.max(0, Math.min(current - 2, steps.length - max));
+  return {
+    visible: steps.slice(start, start + max),
+    hiddenBefore: start,
+    hiddenAfter: steps.length - start - max,
   };
 }
 

@@ -10,6 +10,7 @@ import { announcedRun, isDetailBehindShell } from "./chat/threadActivityAnnounce
 import {
   deriveAvailableRevertTurnCounts,
   deriveThreadPendingBackgroundTasks,
+  deriveThreadTasks,
   presentThreadShellFromProjection,
 } from "./ChatView.logic";
 import { usePullRequestDraftThread } from "./chat/usePullRequestDraftThread";
@@ -356,6 +357,7 @@ import { ChatRightPanel } from "./chat/ChatRightPanel";
 import { useDraftEnvironmentRouting } from "./chat/useDraftEnvironmentRouting";
 import { branchMismatchBannerItem, extensionStatusBannerItem } from "./chat/ThreadActivityBanners";
 import { ThreadNow } from "./chat/ThreadNow";
+import { ThreadTasks } from "./chat/ThreadTasks";
 import type { ThreadStructure } from "@t3tools/client-runtime/state/shell";
 import { useDelayedStatus } from "../hooks/useDelayedStatus";
 import { useTimelineFollow } from "./chat/useTimelineFollow";
@@ -1441,6 +1443,11 @@ export default function ChatView(props: ChatViewProps) {
     activeProviderThread,
   );
   const pendingBackgroundTasks = deriveThreadPendingBackgroundTasks(serverProjection);
+  const threadTasks = deriveThreadTasks(
+    serverProjection,
+    activeActivityRun?.runId ?? null,
+    isLatestRunSettled(activeActivityRun, activeRuntime),
+  );
   const activeWorkStartedAt =
     deriveActiveWorkStartedAt(activeActivityRun, activeRuntime, localDispatchStartedAt) ??
     runlessWorkStartedAt;
@@ -3079,6 +3086,7 @@ export default function ChatView(props: ChatViewProps) {
   // its lifecycle status, guest messages awaiting you, then your queued messages.
   const timelineFooter =
     pendingHandoff === null &&
+    threadTasks === null &&
     !hasThreadNow &&
     threadStatusLine === null &&
     pendingGuestMessageCount === 0 &&
@@ -3093,6 +3101,13 @@ export default function ChatView(props: ChatViewProps) {
               pending
             />
           </div>
+        )}
+        {threadTasks === null ? null : (
+          <ThreadTasks
+            steps={threadTasks.steps}
+            live={threadTasks.live}
+            runningTaskCount={pendingBackgroundTasks.length}
+          />
         )}
         <ThreadNow
           key={routeThreadKey}
