@@ -58,7 +58,7 @@ export function ThreadTasks({
   readonly steps: ReadonlyArray<OrchestrationV2PlanStep>;
   /** The run that wrote the list is still working. */
   readonly live: boolean;
-  /** Background commands and subagents still running, shown under the current step. */
+  /** Work the agent left running after its turn, shown under the current step. */
   readonly runningTaskCount: number;
 }) {
   const { visible, hiddenBefore, hiddenAfter } = windowTaskSteps(steps, MAX_VISIBLE_STEPS);
@@ -71,7 +71,7 @@ export function ThreadTasks({
       <ul
         aria-label={`Tasks: ${done} of ${steps.length} done`}
         data-thread-tasks="true"
-        className="flex flex-col gap-2 rounded-2xl border border-border/80 bg-card/70 p-4 text-sm transition-opacity duration-150 ease-out starting:opacity-0 motion-reduce:transition-none"
+        className="flex flex-col gap-2 rounded-2xl border border-border/80 bg-card p-4 text-sm transition-opacity duration-150 ease-out starting:opacity-0 motion-reduce:transition-none"
       >
         <HiddenSteps
           count={hiddenBefore}

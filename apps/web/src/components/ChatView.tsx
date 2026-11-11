@@ -3106,7 +3106,10 @@ export default function ChatView(props: ChatViewProps) {
           <ThreadTasks
             steps={threadTasks.steps}
             live={threadTasks.live}
-            runningTaskCount={pendingBackgroundTasks.length}
+            // Monitors, which include PR watches, wait on something; they are not running work.
+            runningTaskCount={
+              pendingBackgroundTasks.filter((task) => task.kind !== "monitor").length
+            }
           />
         )}
         <ThreadNow
