@@ -12,6 +12,7 @@ import {
   MenuPopup,
   MenuRadioGroup,
   MenuRadioItem,
+  MenuRadioItemIndicator,
   MenuSeparator,
   MenuSub,
   MenuSubPopup,
@@ -85,12 +86,14 @@ export function SidebarTagFilter(props: {
                   props.onFilterChange();
                 }}
               >
-                <MenuRadioItem value="any" closeOnClick={false}>
-                  Any tag (OR)
-                </MenuRadioItem>
-                <MenuRadioItem value="all" closeOnClick={false}>
-                  All tags (AND)
-                </MenuRadioItem>
+                {(["any", "all"] as const).map((mode) => (
+                  <MenuRadioItem key={mode} value={mode} closeOnClick={false}>
+                    <span className="flex items-center justify-between gap-2">
+                      {mode === "any" ? "Any tag (OR)" : "All tags (AND)"}
+                      <MenuRadioItemIndicator />
+                    </span>
+                  </MenuRadioItem>
+                ))}
               </MenuRadioGroup>
             </MenuGroup>
           </>
