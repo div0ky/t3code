@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vite-plus/test";
 
 const LEGACY_KEY = "t3code:sidebar-folders:v1";
 const FILTER_KEY = "t3code:sidebar-tag-filter:v1";
+const FILTER_MODE_KEY = "t3code:sidebar-tag-filter-mode:v1";
 const first = EnvironmentId.make("first");
 const second = EnvironmentId.make("second");
 const thread = ThreadId.make("thread");
@@ -204,6 +205,26 @@ describe("useSidebarTagsStore", () => {
     expect(JSON.parse(storage.get(FILTER_KEY)!)).toEqual(["shipped"]);
     store.getState().clearFilter();
     expect(storage.has(FILTER_KEY)).toBe(false);
+  });
+
+  it("matches a thread on any chosen tag, or on all of them, and remembers which", async () => {
+    const { store, storage } = await setup();
+    const { matchesTagFilter } = await import("./sidebarTagsStore");
+    const filter = ["Active", "Mobile"];
+    expect(matchesTagFilter(["Mobile", "Other"], filter, "any")).toBe(true);
+    expect(matchesTagFilter(["Mobile", "Other"], filter, "all")).toBe(false);
+    expect(matchesTagFilter(["Active", "Mobile", "Other"], filter, "all")).toBe(true);
+    expect(matchesTagFilter(undefined, filter, "any")).toBe(false);
+
+    expect(store.getState().filterMode).toBe("any");
+    store.getState().setFilterMode("all");
+    expect(JSON.parse(storage.get(FILTER_MODE_KEY)!)).toBe("all");
+    const reloaded = await setup();
+    reloaded.storage.set(FILTER_MODE_KEY, JSON.stringify("all"));
+    vi.resetModules();
+    expect((await import("./sidebarTagsStore")).useSidebarTagsStore.getState().filterMode).toBe(
+      "all",
+    );
   });
 
   it("ignores a filter naming a tag no environment has, and restores it when the tag returns", async () => {

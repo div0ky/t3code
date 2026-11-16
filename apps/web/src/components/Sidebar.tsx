@@ -258,7 +258,7 @@ import {
 import { SidebarContent, SidebarGroup, useSidebar } from "./ui/sidebar";
 import { SidebarChromeFooter, SidebarChromeHeader } from "./sidebar/SidebarChrome";
 import { SidebarHeaderIconButton, SidebarThreadHeader } from "./sidebar/SidebarThreadHeader";
-import { useSidebarTagsStore } from "../sidebarTagsStore";
+import { describeTagFilter, matchesTagFilter, useSidebarTagsStore } from "../sidebarTagsStore";
 import { SidebarTagFilter } from "./sidebar/SidebarTagFilter";
 import { TooltipProvider } from "./ui/tooltip";
 import { composerDraftHasUserContent, DraftId, useComposerDraftStore } from "../composerDraftStore";
@@ -440,6 +440,7 @@ function useSidebarThreads(input: {
   readonly keepEmptyFolders: (group: SidebarProjectSnapshot) => boolean;
 }) {
   const tagFilter = useSidebarTagsStore((store) => store.filter);
+  const tagFilterMode = useSidebarTagsStore((store) => store.filterMode);
   const tagsByThreadKey = useSidebarTagsStore((store) => store.tagsByThreadKey);
   const {
     projectScopeKey,
@@ -500,7 +501,7 @@ function useSidebarThreads(input: {
         ? null
         : (threadKey) =>
             threadKey === routeRowThreadKey ||
-            (tagsByThreadKey[threadKey]?.some((tag) => tagFilter.includes(tag)) ?? false),
+            matchesTagFilter(tagsByThreadKey[threadKey], tagFilter, tagFilterMode),
     delegatedUnderParent,
     serverConfigs,
     connectedEnvironmentIds,
@@ -1133,6 +1134,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     scrollSidebarToTop(sidebarContentRef.current);
   };
   const tagFilter = useSidebarTagsStore((store) => store.filter);
+  const tagFilterMode = useSidebarTagsStore((store) => store.filterMode);
   const clearTagFilter = () => {
     useSidebarTagsStore.getState().clearFilter();
     handleTagFilterChange();
@@ -3815,7 +3817,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 </>
               ) : tagFilter.length > 0 ? (
                 <>
-                  <span>No threads tagged {tagFilter.join(" or ")}</span>
+                  <span>No threads tagged {describeTagFilter(tagFilter, tagFilterMode)}</span>
                   <button
                     type="button"
                     onClick={clearTagFilter}

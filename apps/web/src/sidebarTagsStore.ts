@@ -22,14 +22,34 @@ import { environmentServerConfigsAtom, serverEnvironment } from "./state/server"
 
 const LEGACY_STORAGE_KEY = "t3code:sidebar-folders:v1";
 const FILTER_STORAGE_KEY = "t3code:sidebar-tag-filter:v1";
+const FILTER_MODE_STORAGE_KEY = "t3code:sidebar-tag-filter-mode:v1";
+
+/** Whether a thread needs any one of the filter's tags, or all of them. */
+export type TagFilterMode = "any" | "all";
+
+export function matchesTagFilter(
+  threadTags: readonly string[] | undefined,
+  filter: readonly string[],
+  mode: TagFilterMode,
+): boolean {
+  if (threadTags === undefined) return false;
+  const tagged = (tag: string) => threadTags.includes(tag);
+  return mode === "all" ? filter.every(tagged) : filter.some(tagged);
+}
+
+/** The filter as a phrase: "Active or Mobile", "Active and Mobile". */
+export const describeTagFilter = (filter: readonly string[], mode: TagFilterMode) =>
+  filter.join(mode === "all" ? " and " : " or ");
 
 interface SidebarTagsStore {
   /** Tag names, one per name however many environments hold it. */
   readonly tags: readonly string[];
   /** A thread's tag names. An array keeps its identity until that thread's tags change. */
   readonly tagsByThreadKey: Readonly<Record<string, readonly string[]>>;
-  /** The tags the sidebar is narrowed to; a thread shows when it has any. Empty shows every thread. */
+  /** The tags the sidebar is narrowed to, matched by `filterMode`. Empty shows every thread. */
   readonly filter: readonly string[];
+  readonly filterMode: TagFilterMode;
+  readonly setFilterMode: (mode: TagFilterMode) => void;
   readonly toggleFilter: (name: string) => void;
   readonly clearFilter: () => void;
   readonly setThreadsTag: (threadKeys: readonly string[], name: string, tagged: boolean) => void;
@@ -76,6 +96,8 @@ const storedFilter = typeof window === "undefined" ? null : readJson(FILTER_STOR
 let chosenFilterKeys: readonly string[] = Array.isArray(storedFilter)
   ? storedFilter.filter((key) => typeof key === "string")
   : [];
+const storedFilterMode: TagFilterMode =
+  typeof window !== "undefined" && readJson(FILTER_MODE_STORAGE_KEY) === "all" ? "all" : "any";
 const mirror = createSidebarTagMirror();
 
 /** New chats' tags with `name` renamed, or dropped without `nextName`; untouched lists keep their identity. */
@@ -288,6 +310,11 @@ export const useSidebarTagsStore = create<SidebarTagsStore>((set, get) => ({
     );
   },
   clearFilter: () => setChosenFilterKeys([]),
+  filterMode: storedFilterMode,
+  setFilterMode: (filterMode) => {
+    writeLocal(FILTER_MODE_STORAGE_KEY, filterMode === "all" ? filterMode : null);
+    set({ filterMode });
+  },
   setThreadsTag: (threadKeys, name, tagged) => {
     if (name.trim().length === 0) return;
     const threadIdsByEnvironment = new Map<EnvironmentId, ThreadId[]>();
