@@ -142,10 +142,11 @@ open.
 
 ### Tag threads and filter by tag
 
-On web and desktop, open a thread's menu and choose **Tags** to tag it. Pick an existing tag, or
-**New tag…** to name one. A thread can have several tags, and tagging never moves it: it keeps its
-place, pin, and section. Select several threads first to tag them all at once. A thread's card
-shows its tags.
+On web and desktop, open a thread's menu and choose **Tags…**. Tick as many tags as you want; the
+list stays open until you click away. Type to find a tag, or type a new name and press Enter to
+create it on the thread. A thread can have several tags, and tagging never moves it: it keeps its
+place, pin, and section. Select several threads first to tag them all at once; a tag only some of
+them have shows a dash. A thread's card shows its tags.
 
 Use the tag button next to the search box to choose which tags to show. Pick one or more and the
 sidebar lists only threads with any of them, in every section, and search looks only within
