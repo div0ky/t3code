@@ -50,7 +50,6 @@ import {
   PinOffIcon,
   ShieldQuestionIcon,
   SquarePenIcon,
-  TagIcon,
   TerminalIcon,
   Undo2Icon,
   UserRoundIcon,
@@ -70,6 +69,7 @@ import { useRightPanelStore } from "../../rightPanelStore";
 import { useOpenPrLink } from "../../lib/openPullRequestLink";
 import { useUiStateStore } from "../../uiStateStore";
 import { useSidebarTagsStore } from "../../sidebarTagsStore";
+import { TagPulseIcon } from "../TagPulseIcon";
 import { useThreadSelectionStore } from "../../threadSelectionStore";
 import { useNowMinute } from "../../hooks/useNowMinute";
 import { useNowSecond } from "../../hooks/useNowSecond";
@@ -1484,7 +1484,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                       />
                     }
                   >
-                    <TagIcon aria-hidden className="size-3 shrink-0" />
+                    <TagPulseIcon target={threadKey} className="size-3 shrink-0" />
                     <span className="truncate">{tagNames}</span>
                   </TooltipTrigger>
                   <TooltipPopup side="top">Tags: {tagNames}</TooltipPopup>

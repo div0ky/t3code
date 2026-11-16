@@ -1,8 +1,7 @@
-import { TagIcon } from "lucide-react";
-
 import { useSidebarTagsStore } from "../sidebarTagsStore";
 import { ComposerControl } from "./chat/ComposerControl";
 import { ComposerContextLabel } from "./ComposerContextLabel";
+import { TagPulseIcon } from "./TagPulseIcon";
 import { openThreadTagPicker } from "./ThreadTagPicker";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 
@@ -26,7 +25,7 @@ export function ComposerContextTags({ draftId }: { draftId: string }) {
           />
         }
       >
-        <TagIcon aria-hidden="true" className="size-3" />
+        <TagPulseIcon target={draftId} className="size-3" />
         <ComposerContextLabel>{label}</ComposerContextLabel>
       </TooltipTrigger>
       <TooltipPopup>Tags for this chat</TooltipPopup>

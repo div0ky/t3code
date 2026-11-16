@@ -181,7 +181,7 @@ describe("useSidebarTagsStore", () => {
     expect(store.getState().tagsByThreadKey[`${first}:a`]).toBe(before);
   });
 
-  it("drops a deleted tag from the filter and follows a rename", async () => {
+  it("drops a deleted tag from the filter and new chats, and follows a rename", async () => {
     const { store, storage, connect } = await setup();
     connect(first);
     store.getState().createTag("Shipping", first);
@@ -189,11 +189,18 @@ describe("useSidebarTagsStore", () => {
     store.getState().toggleFilter("Shipping");
     store.getState().toggleFilter("Later");
     expect(store.getState().filter).toEqual(["Later", "Shipping"]);
+    store.getState().setDraftTag("draft", "shipping", true);
+    store.getState().setDraftTag("draft", "Later", true);
+    store.getState().setDraftTag("other", "Unrelated", true);
+    const untouched = store.getState().draftTags.other;
 
     store.getState().renameTag("Shipping", "Shipped");
     expect(store.getState().filter).toEqual(["Later", "Shipped"]);
+    expect(store.getState().draftTags.draft).toEqual(["Shipped", "Later"]);
     store.getState().deleteTag("Later");
     expect(store.getState().filter).toEqual(["Shipped"]);
+    expect(store.getState().draftTags.draft).toEqual(["Shipped"]);
+    expect(store.getState().draftTags.other).toBe(untouched);
     expect(JSON.parse(storage.get(FILTER_KEY)!)).toEqual(["shipped"]);
     store.getState().clearFilter();
     expect(storage.has(FILTER_KEY)).toBe(false);

@@ -278,21 +278,27 @@ describe("detectComposerTrigger", () => {
     expect(detectComposerTrigger(text, text.length)).toBeNull();
   });
 
-  it("detects a pull request number at a token boundary", () => {
-    const text = "Compare this with #8737";
-
+  it.each([
+    ["Compare this with ##8737", "pull-request", "8737"],
+    ["Compare this with ##", "pull-request", ""],
+    ["Compare this with #act", "tag", "act"],
+    ["Compare this with #", "tag", ""],
+    ["Compare this with #8737", "tag", "8737"],
+  ] as const)("detects %j as a %s trigger at a token boundary", (text, kind, query) => {
     expect(detectComposerTrigger(text, text.length)).toEqual({
-      kind: "pull-request",
-      query: "8737",
+      kind,
+      query,
       rangeStart: "Compare this with ".length,
       rangeEnd: text.length,
     });
   });
 
-  it("does not keep pull request completion active for headings or embedded hashes", () => {
-    expect(detectComposerTrigger("# Heading", "# Heading".length)).toBeNull();
-    expect(detectComposerTrigger("issue#123", "issue#123".length)).toBeNull();
-  });
+  it.each(["# Heading", "## Heading", "issue#123", "issue##123", "###", "###12", "#-x"])(
+    "does not keep tag or pull request completion active for %j",
+    (text) => {
+      expect(detectComposerTrigger(text, text.length)).toBeNull();
+    },
+  );
 
   // regression: #936 @file autocomplete used the wrong cursor when typing mid-text
   it("detects @path trigger in the middle of existing text", () => {

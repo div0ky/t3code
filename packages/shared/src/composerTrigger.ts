@@ -128,7 +128,7 @@ export function detectComposerTrigger(
       rangeEnd: cursor,
     };
   }
-  const pullRequestMatch = /^#([\p{L}\p{N}][\p{L}\p{N}_-]*)?$/u.exec(token);
+  const pullRequestMatch = /^##([\p{L}\p{N}][\p{L}\p{N}_-]*)?$/u.exec(token);
   if (pullRequestMatch)
     return {
       kind: "pull-request",
