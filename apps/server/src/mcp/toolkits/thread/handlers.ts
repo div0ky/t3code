@@ -6,7 +6,7 @@ import {
   type RunId,
   OrchestratorMcpFailure,
   type OrchestrationV2Command,
-  type SidebarFolderOperation,
+  type SidebarTagOperation,
 } from "@t3tools/contracts";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Effect from "effect/Effect";
@@ -93,30 +93,30 @@ const writesThread = <P extends { readonly threadId?: ThreadId | undefined }, A,
   handle: (params: P) => Effect.Effect<A, E, R>,
 ) => McpToolAccess.writesThreads((params: P) => [params.threadId], handle);
 
-const organizeFolders = Effect.fn("mcp.organizeFolders")(function* (input: {
-  readonly action: "create" | "rename" | "delete" | "move_threads" | "remove_threads";
-  readonly folderId?: string | undefined;
+const organizeTags = Effect.fn("mcp.organizeTags")(function* (input: {
+  readonly action: "create" | "rename" | "delete" | "tag_threads" | "untag_threads";
+  readonly tagId?: string | undefined;
   readonly name?: string | undefined;
   readonly threadIds?: ReadonlyArray<ThreadId> | undefined;
 }) {
   const settings = yield* Settings.ServerSettingsService;
-  const existingFolderId = Effect.gen(function* () {
-    const folderId = yield* required(input.folderId, "folderId");
-    const { sidebarFolders } = yield* settings.getSettings.pipe(Effect.mapError(unavailable));
-    if (sidebarFolders.some((folder) => folder.id === folderId)) return folderId;
+  const existingTagId = Effect.gen(function* () {
+    const tagId = yield* required(input.tagId, "tagId");
+    const { sidebarTags } = yield* settings.getSettings.pipe(Effect.mapError(unavailable));
+    if (sidebarTags.some((tag) => tag.id === tagId)) return tagId;
     return yield* new OrchestratorMcpFailure({
       code: "invalid_request",
-      message: "The folder was not found. Call t3_folder_list for its id.",
+      message: "The tag was not found. Call t3_tag_list for its id.",
     });
   });
-  let operation: SidebarFolderOperation;
+  let operation: SidebarTagOperation;
   switch (input.action) {
     case "create": {
       const random = yield* SecureRandom.SecureRandom;
       operation = {
         action: "create",
         name: yield* required(input.name, "name"),
-        folderId: yield* random.uuidV4(),
+        tagId: yield* random.uuidV4(),
       };
       break;
     }
@@ -124,38 +124,36 @@ const organizeFolders = Effect.fn("mcp.organizeFolders")(function* (input: {
       operation = {
         action: "rename",
         name: yield* required(input.name, "name"),
-        folderId: yield* existingFolderId,
+        tagId: yield* existingTagId,
       };
       break;
     case "delete":
-      operation = { action: "delete", folderId: yield* existingFolderId };
+      operation = { action: "delete", tagId: yield* existingTagId };
       break;
     default: {
-      const folderId = input.action === "move_threads" ? yield* existingFolderId : null;
+      const tagId = yield* existingTagId;
       const threadIds = yield* Effect.forEach(input.threadIds ?? [undefined], (threadId) =>
         readThread(threadId).pipe(Effect.map(({ projection }) => projection.thread.id)),
       );
-      operation = { action: "move_threads", threadIds, folderId };
+      operation = { action: input.action, threadIds, tagId };
     }
   }
-  const updated = yield* settings
-    .updateSidebarFolders(operation)
-    .pipe(Effect.mapError(unavailable));
-  return { folders: updated.sidebarFolders };
+  const updated = yield* settings.updateSidebarTags(operation).pipe(Effect.mapError(unavailable));
+  return { tags: updated.sidebarTags };
 });
 
 export const layer = McpToolAccess.toLayer(ThreadToolkit, {
-  t3_folder_list: McpToolAccess.reads(() =>
+  t3_tag_list: McpToolAccess.reads(() =>
     Effect.gen(function* () {
       const settings = yield* Settings.ServerSettingsService;
-      const { sidebarFolders } = yield* settings.getSettings.pipe(Effect.mapError(unavailable));
-      return { folders: sidebarFolders };
+      const { sidebarTags } = yield* settings.getSettings.pipe(Effect.mapError(unavailable));
+      return { tags: sidebarTags };
     }),
   ),
-  t3_folder_organize: McpToolAccess.either(
-    (input) => input.action === "move_threads" || input.action === "remove_threads",
-    McpToolAccess.writesThreads((input) => input.threadIds ?? [undefined], organizeFolders),
-    McpToolAccess.writes(organizeFolders),
+  t3_tag_organize: McpToolAccess.either(
+    (input) => input.action === "tag_threads" || input.action === "untag_threads",
+    McpToolAccess.writesThreads((input) => input.threadIds ?? [undefined], organizeTags),
+    McpToolAccess.writes(organizeTags),
   ),
   run_scheduled_task_now: McpToolAccess.writesEnvironment((input) =>
     Effect.gen(function* () {

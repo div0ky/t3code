@@ -581,7 +581,7 @@ it.effect("a client caller targets any thread within its ceiling and cannot act 
   ),
 );
 
-it.effect("organizes folders, keeps concurrent moves, and rejects unknown folders", () =>
+it.effect("organizes tags, keeps concurrent tagging, and rejects unknown tags", () =>
   Effect.gen(function* () {
     const server = yield* McpServer.McpServer;
     const call = (name: string, args: Record<string, unknown>) =>
@@ -595,45 +595,44 @@ it.effect("organizes folders, keeps concurrent moves, and rejects unknown folder
           Effect.provideService(McpSchema.McpServerClient, client),
         );
     const list = () =>
-      call("t3_folder_list", {}).pipe(
+      call("t3_tag_list", {}).pipe(
         Effect.map(
           (result) =>
-            (result.structuredContent as { folders: ReadonlyArray<Record<string, unknown>> })
-              .folders,
+            (result.structuredContent as { tags: ReadonlyArray<Record<string, unknown>> }).tags,
         ),
       );
 
-    yield* call("t3_folder_organize", { action: "create", name: "Work" });
-    const folderId = (yield* list())[0]?.id;
+    yield* call("t3_tag_organize", { action: "create", name: "Work" });
+    const tagId = (yield* list())[0]?.id;
 
     yield* Effect.forEach(
       ["a", "b", "c"],
-      (id) => call("t3_folder_organize", { action: "move_threads", folderId, threadIds: [id] }),
+      (id) => call("t3_tag_organize", { action: "tag_threads", tagId, threadIds: [id] }),
       { concurrency: "unbounded" },
     );
     const filed = (yield* list())[0]?.threadIds;
     expect(filed).toHaveLength(3);
     expect(filed).toEqual(expect.arrayContaining(["a", "b", "c"]));
 
-    yield* call("t3_folder_organize", { action: "rename", folderId, name: "Shipping" });
-    yield* call("t3_folder_organize", { action: "remove_threads", threadIds: ["b"] });
+    yield* call("t3_tag_organize", { action: "rename", tagId, name: "Shipping" });
+    yield* call("t3_tag_organize", { action: "untag_threads", tagId, threadIds: ["b"] });
     expect((yield* list())[0]).toMatchObject({ name: "Shipping" });
     expect((yield* list())[0]?.threadIds).not.toContain("b");
 
     expect(
       declaredFailure(
-        yield* call("t3_folder_organize", {
-          action: "move_threads",
-          folderId: "gone",
+        yield* call("t3_tag_organize", {
+          action: "tag_threads",
+          tagId: "gone",
           threadIds: ["a"],
         }),
       ),
     ).toMatchObject({ code: "invalid_request" });
-    expect(declaredFailure(yield* call("t3_folder_organize", { action: "create" }))).toMatchObject({
+    expect(declaredFailure(yield* call("t3_tag_organize", { action: "create" }))).toMatchObject({
       code: "invalid_request",
     });
 
-    yield* call("t3_folder_organize", { action: "delete", folderId });
+    yield* call("t3_tag_organize", { action: "delete", tagId });
     expect(yield* list()).toEqual([]);
   }).pipe(
     Effect.provide(
@@ -678,8 +677,8 @@ it.effect("a read-only client reads threads and is refused every write before it
       threadId: "other-project-thread",
     });
     expect(declaredFailure(pinned)).toMatchObject({ code: "capability_denied" });
-    const folder = yield* call("t3_folder_organize", { action: "create", name: "Work" });
-    expect(declaredFailure(folder)).toMatchObject({ code: "capability_denied" });
+    const tag = yield* call("t3_tag_organize", { action: "create", name: "Work" });
+    expect(declaredFailure(tag)).toMatchObject({ code: "capability_denied" });
     expect(dispatched).toEqual([]);
 
     const configure = yield* call("t3_thread_configure", {

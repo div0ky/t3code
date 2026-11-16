@@ -1321,87 +1321,66 @@ export const StorageCleanupSettings = Schema.Struct({
 });
 export type StorageCleanupSettings = typeof StorageCleanupSettings.Type;
 
-export const SidebarFolder = Schema.Struct({
+export const SidebarTag = Schema.Struct({
   id: TrimmedNonEmptyString,
   name: TrimmedNonEmptyString,
   threadIds: Schema.Array(ThreadId),
 });
-export type SidebarFolder = typeof SidebarFolder.Type;
+export type SidebarTag = typeof SidebarTag.Type;
 
-export const SidebarFolderOperation = Schema.Union([
+export const SidebarTagOperation = Schema.Union([
   Schema.Struct({
     action: Schema.Literal("create"),
-    folderId: TrimmedNonEmptyString,
+    tagId: TrimmedNonEmptyString,
     name: TrimmedNonEmptyString,
   }),
   Schema.Struct({
     action: Schema.Literal("rename"),
-    folderId: TrimmedNonEmptyString,
+    tagId: TrimmedNonEmptyString,
     name: TrimmedNonEmptyString,
   }),
-  Schema.Struct({ action: Schema.Literal("delete"), folderId: TrimmedNonEmptyString }),
+  Schema.Struct({ action: Schema.Literal("delete"), tagId: TrimmedNonEmptyString }),
   Schema.Struct({
-    action: Schema.Literal("reorder"),
-    folderId: TrimmedNonEmptyString,
-    beforeFolderId: Schema.NullOr(TrimmedNonEmptyString),
+    action: Schema.Literal("tag_threads"),
+    tagId: TrimmedNonEmptyString,
+    threadIds: Schema.Array(ThreadId),
   }),
   Schema.Struct({
-    action: Schema.Literal("move_threads"),
+    action: Schema.Literal("untag_threads"),
+    tagId: TrimmedNonEmptyString,
     threadIds: Schema.Array(ThreadId),
-    // Null takes the threads out of every folder.
-    folderId: Schema.NullOr(TrimmedNonEmptyString),
   }),
 ]);
-export type SidebarFolderOperation = typeof SidebarFolderOperation.Type;
+export type SidebarTagOperation = typeof SidebarTagOperation.Type;
 
-// ponytail: deleting a thread leaves its id in its folder; prune on thread deletion if files grow.
-export function applySidebarFolderOperation(
-  folders: ReadonlyArray<SidebarFolder>,
-  operation: SidebarFolderOperation,
-): ReadonlyArray<SidebarFolder> {
+// ponytail: deleting a thread leaves its id on its tags; prune on thread deletion if files grow.
+export function applySidebarTagOperation(
+  tags: ReadonlyArray<SidebarTag>,
+  operation: SidebarTagOperation,
+): ReadonlyArray<SidebarTag> {
+  const onTag = (update: (tag: SidebarTag) => SidebarTag) =>
+    tags.map((tag) => (tag.id === operation.tagId ? update(tag) : tag));
   switch (operation.action) {
     case "create":
-      // Idempotent so a retried import cannot duplicate a folder.
-      return folders.some((folder) => folder.id === operation.folderId)
-        ? folders
-        : [...folders, { id: operation.folderId, name: operation.name, threadIds: [] }];
+      // Idempotent so a retried import cannot duplicate a tag.
+      return tags.some((tag) => tag.id === operation.tagId)
+        ? tags
+        : [...tags, { id: operation.tagId, name: operation.name, threadIds: [] }];
     case "rename":
-      return folders.map((folder) =>
-        folder.id === operation.folderId ? { ...folder, name: operation.name } : folder,
-      );
+      return onTag((tag) => ({ ...tag, name: operation.name }));
     case "delete":
-      return folders.filter((folder) => folder.id !== operation.folderId);
-    case "reorder": {
-      const moved = folders.find((folder) => folder.id === operation.folderId);
-      if (!moved || operation.folderId === operation.beforeFolderId) return folders;
-      if (
-        operation.beforeFolderId !== null &&
-        !folders.some((folder) => folder.id === operation.beforeFolderId)
-      )
-        return folders;
-      const reordered = folders.filter((folder) => folder.id !== operation.folderId);
-      const index =
-        operation.beforeFolderId === null
-          ? reordered.length
-          : reordered.findIndex((folder) => folder.id === operation.beforeFolderId);
-      reordered.splice(index, 0, moved);
-      return reordered;
-    }
-    case "move_threads": {
-      if (
-        operation.folderId !== null &&
-        !folders.some((folder) => folder.id === operation.folderId)
-      ) {
-        return folders;
-      }
-      const moved = new Set(operation.threadIds);
-      return folders.map((folder) => {
-        const kept = folder.threadIds.filter((threadId) => !moved.has(threadId));
-        return {
-          ...folder,
-          threadIds: folder.id === operation.folderId ? [...kept, ...moved] : kept,
-        };
-      });
+      return tags.filter((tag) => tag.id !== operation.tagId);
+    case "tag_threads":
+      return onTag((tag) => ({
+        ...tag,
+        threadIds: [...new Set([...tag.threadIds, ...operation.threadIds])],
+      }));
+    case "untag_threads": {
+      const removed = new Set(operation.threadIds);
+      return onTag((tag) => ({
+        ...tag,
+        threadIds: tag.threadIds.filter((threadId) => !removed.has(threadId)),
+      }));
     }
   }
 }
@@ -1416,7 +1395,7 @@ export const CloudSpeechCredentials = Schema.Struct({
 });
 
 export const ServerSettings = Schema.Struct({
-  sidebarFolders: Schema.Array(SidebarFolder).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
+  sidebarTags: Schema.Array(SidebarTag).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
   // Null means unmigrated; empty is authoritative and must not resurrect cleared preferences.
   favorites: Schema.NullOr(ModelFavorites).pipe(Schema.withDecodingDefault(Effect.succeed(null))),
   providerModelPreferences: Schema.NullOr(ProviderModelPreferences).pipe(

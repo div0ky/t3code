@@ -35,8 +35,6 @@ import {
   resolveSidebarDropVerb,
   groupSidebarThreadsByProject,
   placeSidebarPins,
-  resolveFolderDropOrder,
-  groupThreadsBySidebarFolder,
   resolveSidebarFolderDot,
   sidebarFolderExpansionKeys,
 } from "./Sidebar.logic";
@@ -1678,23 +1676,16 @@ describe("shouldCreateNewThreadInCurrentProject", () => {
   });
 });
 
-it("keeps ordinary pins first in their folders and Global Pins above folders", () => {
+it("keeps regular pins first in the active list and Global Pins above it", () => {
   const normal = { id: "normal", globallyPinned: false };
   const global = { id: "global", globallyPinned: true };
   const active = { id: "active", globallyPinned: false };
   const placed = placeSidebarPins([normal, global], [active]);
-  const grouped = groupThreadsBySidebarFolder({
-    threads: placed.activeThreads,
-    folders: [{ id: "work", name: "Work", collapsed: false }],
-    folderIdByThreadKey: { normal: "work", global: "work", active: "work" },
-    keyOf: (thread) => thread.id,
-  });
   expect(placed.pinnedThreads).toEqual([global]);
-  expect(grouped.folders[0]?.threads).toEqual([normal, active]);
-  expect(grouped.unfiled).toEqual([]);
+  expect(placed.activeThreads).toEqual([normal, active]);
 });
 
-it("reorders regular pins within a folder without unpinning or moving ordinary rows", () => {
+it("reorders regular pins without unpinning or moving ordinary rows", () => {
   const plan = planSidebarThreadDrop({
     activeKey: "p2",
     activeSection: "active",
@@ -1717,36 +1708,7 @@ it("reorders regular pins within a folder without unpinning or moving ordinary r
   expect(plan.assignments[0]!.orderKey < "m").toBe(true);
 });
 
-it("leaves folder pins out of the ordinary active reorder plan", () => {
-  const target = resolveFolderDropOrder(
-    {
-      section: "active" as const,
-      pinnedOrder: [],
-      activeOrder: ["p", "y", "x"],
-      folderId: null,
-      activeSlots: [],
-      folderSiblings: [],
-    },
-    ["p", "x", "y"],
-    "y",
-    new Set(["p"]),
-  );
-  expect(target.activeOrder).toEqual(["y", "x"]);
-  const plan = planSidebarThreadDrop({
-    activeKey: "y",
-    activeSection: "active",
-    target,
-    pinnedOrder: [],
-    pinnedKeysById: new Map(),
-    activeOrder: ["x", "y"],
-    activeKeysById: new Map(),
-  });
-  expect(plan.kind).toBe("move-active");
-  if (plan.kind !== "move-active") throw new Error("Expected active reorder");
-  expect(plan.assignments.map(({ id }) => id).sort()).toEqual(["x", "y"]);
-});
-
-it("wakes a snoozed folder pin instead of planning a pin reorder", () => {
+it("wakes a snoozed regular pin instead of planning a pin reorder", () => {
   expect(
     planSidebarThreadDrop({
       activeKey: "s",

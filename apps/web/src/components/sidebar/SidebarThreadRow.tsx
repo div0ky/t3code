@@ -43,7 +43,6 @@ import {
   CircleDashedIcon,
   CircleDotDashedIcon,
   ClockIcon,
-  FolderIcon,
   GitBranchIcon,
   MessageCircleQuestionIcon,
   FlameIcon,
@@ -51,6 +50,7 @@ import {
   PinOffIcon,
   ShieldQuestionIcon,
   SquarePenIcon,
+  TagIcon,
   TerminalIcon,
   Undo2Icon,
   UserRoundIcon,
@@ -69,7 +69,7 @@ import {
 import { useRightPanelStore } from "../../rightPanelStore";
 import { useOpenPrLink } from "../../lib/openPullRequestLink";
 import { useUiStateStore } from "../../uiStateStore";
-import { useSidebarFoldersStore } from "../../sidebarFoldersStore";
+import { useSidebarTagsStore } from "../../sidebarTagsStore";
 import { useThreadSelectionStore } from "../../threadSelectionStore";
 import { useNowMinute } from "../../hooks/useNowMinute";
 import { useNowSecond } from "../../hooks/useNowSecond";
@@ -661,12 +661,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
   } = props;
   const threadRef = scopeThreadRef(thread.environmentId, thread.id);
   const threadKey = scopedThreadKey(threadRef);
-  const folderName = useSidebarFoldersStore((state) =>
-    thread.pinnedAt != null && thread.globallyPinned
-      ? (state.folders.find((folder) => folder.id === state.folderIdByThreadKey[threadKey])?.name ??
-        null)
-      : null,
-  );
+  const tagNames = useSidebarTagsStore((state) => state.tagsByThreadKey[threadKey])?.join(", ");
   const canOperateThread = useEnvironmentScope(thread.environmentId, AuthOrchestrationOperateScope);
   const { leaseLiveStatus, rowRef: leaseRowRef } = useSidebarRowSubscriptionLease(props.isActive);
   const { revealRef } = props;
@@ -1479,20 +1474,20 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
               ) : (
                 <span className="flex-1" />
               )}
-              {folderName ? (
+              {tagNames ? (
                 <Tooltip>
                   <TooltipTrigger
                     render={
                       <span
-                        className="inline-flex min-w-0 max-w-1/2 items-center gap-1 text-xs text-secondary-label"
-                        aria-label={`Folder: ${folderName}`}
+                        className="inline-flex min-w-0 max-w-1/3 items-center gap-1 text-xs text-secondary-label"
+                        aria-label={`Tags: ${tagNames}`}
                       />
                     }
                   >
-                    <FolderIcon aria-hidden className="size-3 shrink-0" />
-                    <span className="truncate">{folderName}</span>
+                    <TagIcon aria-hidden className="size-3 shrink-0" />
+                    <span className="truncate">{tagNames}</span>
                   </TooltipTrigger>
-                  <TooltipPopup side="top">Folder: {folderName}</TooltipPopup>
+                  <TooltipPopup side="top">Tags: {tagNames}</TooltipPopup>
                 </Tooltip>
               ) : null}
               {sortable?.isDragging ? (

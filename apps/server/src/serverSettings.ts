@@ -16,8 +16,8 @@ import {
   ServerSettings,
   ServerSettingsError,
   type ServerSettingsPatch,
-  type SidebarFolderOperation,
-  applySidebarFolderOperation,
+  type SidebarTagOperation,
+  applySidebarTagOperation,
   type ManagedPolicySummary,
   globalIdleCompaction,
   isSecretReference,
@@ -141,12 +141,21 @@ const normalizeServerSettings = (
     ),
   );
 
-const withSidebarFolderOperation = (
+// Folders became tags; a file saved before that still names its threads under the old key.
+const withLegacySidebarFolders = (stored: unknown): unknown =>
+  typeof stored === "object" &&
+  stored !== null &&
+  "sidebarFolders" in stored &&
+  !("sidebarTags" in stored)
+    ? { ...stored, sidebarTags: stored.sidebarFolders }
+    : stored;
+
+const withSidebarTagOperation = (
   settings: ServerSettings,
-  operation: SidebarFolderOperation,
+  operation: SidebarTagOperation,
 ): ServerSettings => ({
   ...settings,
-  sidebarFolders: applySidebarFolderOperation(settings.sidebarFolders, operation),
+  sidebarTags: applySidebarTagOperation(settings.sidebarTags, operation),
 });
 
 export function redactServerSettingsForClient(
@@ -282,8 +291,8 @@ export class ServerSettingsService extends Context.Service<
     ) => Effect.Effect<ServerSettings, ServerSettingsError>;
 
     /** Applied under the write lock, so concurrent moves cannot overwrite each other. */
-    readonly updateSidebarFolders: (
-      operation: SidebarFolderOperation,
+    readonly updateSidebarTags: (
+      operation: SidebarTagOperation,
     ) => Effect.Effect<ServerSettings, ServerSettingsError>;
 
     readonly withSettingsSnapshot: <A, E, R>(
@@ -351,9 +360,9 @@ const makeTest = Effect.fn("serverSettings.makeTest")(function* (
           return applyProviderInstanceMutation(patched, mutation);
         }),
       ),
-    updateSidebarFolders: (operation) =>
+    updateSidebarTags: (operation) =>
       updateTestSettings((currentSettings) =>
-        Effect.succeed(withSidebarFolderOperation(currentSettings, operation)),
+        Effect.succeed(withSidebarTagOperation(currentSettings, operation)),
       ),
     withSettingsSnapshot: (use) =>
       writeSemaphore.withPermits(1)(getSettings.pipe(Effect.flatMap(use))),
@@ -813,7 +822,9 @@ const make = Effect.gen(function* () {
       const parsed = decodeSettingsFileJsonExit(raw);
       const decoded = Exit.isFailure(parsed)
         ? parsed
-        : decodePersistedServerSettingsExit(managed.withDefaults(parsed.value));
+        : decodePersistedServerSettingsExit(
+            managed.withDefaults(withLegacySidebarFolders(parsed.value)),
+          );
       const legacySettings = decodeLegacyProviderSettingsJsonExit(raw);
       if (legacySettings._tag === "Success") {
         legacyProviders = legacySettings.value.providers;
@@ -1401,9 +1412,9 @@ const make = Effect.gen(function* () {
           return applyProviderInstanceMutation(patched, mutation);
         }),
       ),
-    updateSidebarFolders: (operation) =>
+    updateSidebarTags: (operation) =>
       updateAndPersistSettings({}, (current) =>
-        Effect.succeed(withSidebarFolderOperation(current, operation)),
+        Effect.succeed(withSidebarTagOperation(current, operation)),
       ),
     withSettingsSnapshot,
     get streamChanges() {

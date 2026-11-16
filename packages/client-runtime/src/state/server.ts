@@ -1205,9 +1205,9 @@ export function createServerEnvironmentAtoms<R, E>(
 
   return {
     configValueAtom,
-    updateSidebarFolders: createEnvironmentRpcCommand(runtime, {
-      label: "environment-data:server:update-sidebar-folders",
-      tag: WS_METHODS.serverUpdateSidebarFolders,
+    updateSidebarTags: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:update-sidebar-tags",
+      tag: WS_METHODS.serverUpdateSidebarTags,
       scheduler: configScheduler,
       concurrency: configConcurrency,
     }),

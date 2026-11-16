@@ -60,16 +60,16 @@ and worktree while you stay in the new thread composer. This requires a Git proj
 ## Flag urgent threads
 
 Choose **Mark urgent** from a thread's menu to move it to the **Urgent** section at the top
-of the sidebar, above global pins. A folder shows a red badge counting its urgent threads.
+of the sidebar, above global pins. In **Boring sidebar**, a project folder shows a red badge
+counting its urgent threads.
 Snoozed and settled threads stay on their shelves. **Clear urgent** removes the flag and
 returns the thread to its place. Archiving also removes it, and unarchiving does not bring it back. Urgent threads
 are not auto-settled.
 
 ## Pin and reorder threads
 
-Pin a thread from its menu to keep it at the top of its folder. Choose **Pin Globally**
-to keep it above all folders. **Pin** changes a global pin back to a regular pin.
-Threads without a folder keep their regular pins at the top of the unfiled list.
+Pin a thread from its menu to keep it at the top of the active list. Choose **Pin Globally**
+to keep it in its own section above that list. **Pin** changes a global pin back to a regular pin.
 
 On web and desktop, unpinning, settling, snoozing, and archiving a thread each show
 a notification with **Undo** for five seconds. Undo restores the thread's previous
@@ -88,7 +88,7 @@ scroll position instead of following the thread to its new place in the list.
 
 Pinning does not prevent automatic settlement. Settling a thread removes its pin.
 
-On web and desktop, drag regular pins within a folder to reorder them. Drag a thread between sections to change its state. Drag a thread up into
+On web and desktop, drag regular pins to reorder them. Drag a thread between sections to change its state. Drag a thread up into
 the Global Pins section to pin it globally at the spot you drop it; drag a globally pinned thread down into the active
 list to unpin it. Dragging a thread onto the **Settled** header settles it, and dragging a settled
 thread into the active list un-settles it. A snoozed thread can be dragged out of the snoozed
@@ -140,27 +140,26 @@ rename a thread, regenerate its title, or link and unlink a pull request. These 
 appear on web, desktop, and mobile without requiring the originating browser to remain
 open.
 
-### Organize threads into folders
+### Tag threads and filter by tag
 
-On web and desktop, use **New folder** next to the search box, then name it. Drag a thread onto a
-folder's header, or between the threads inside it, to file it there. Drag it back up to the list
-above the folders to take it out, or use **Move to folder** in the thread's menu. Click a header to
-collapse the folder. A collapsed folder still shows the thread you have open, and a dot when a
-hidden thread needs you. Right-click a header to rename or delete it. Deleting a folder keeps its
-threads.
+On web and desktop, open a thread's menu and choose **Tags** to tag it. Pick an existing tag, or
+**New tag…** to name one. A thread can have several tags, and tagging never moves it: it keeps its
+place, pin, and section. Select several threads first to tag them all at once. A thread's card
+shows its tags.
 
-Folders hold active threads and regular pins. Pinning globally, snoozing, or settling a thread
-moves it out of the folder; it returns when changed back to an active thread or regular pin. Folders are hidden while
-**Boring sidebar** is on.
+Use the tag button next to the search box to choose which tags to show. Pick one or more and the
+sidebar lists only threads with any of them, in every section, and search looks only within
+them. The button shows a dot while a filter is on; choose **Show all threads** to clear it. The thread you have open stays listed even
+when it has none of the chosen tags, so a new thread does not vanish before you tag it. While a
+tag filter is on, the Settled section lists only the settled threads this device already holds,
+not older ones it would load on request.
 
-Folders belong to an environment, so every web and desktop client connected to it sees the same
-ones, and agents can organize them for you. A thread can only join a folder in its own environment.
-A new folder goes in the environment of the thread you have open. Whether a folder is collapsed is
-saved per client.
+The same menu creates, renames, and deletes tags. Deleting a tag keeps its threads.
 
-Right-click a custom folder and choose **Move up** or **Move down** to reorder it
-among folders in the same environment. The order is saved on that environment and
-shared with your other connected clients.
+Tags are saved on the environment, so every web and desktop client connected to it sees the same
+ones, and agents can tag threads for you. Tags with the same name in different environments act as
+one tag. Which tags you filter by is saved per device. Folders you made before tags existed
+become tags with the same names and threads.
 
 ### Fold working threads (beta)
 
