@@ -4,7 +4,7 @@ import {
   type RuntimeMode,
   type ThreadId,
 } from "@t3tools/contracts";
-import { scopeThreadRef } from "@t3tools/client-runtime/environment";
+import { scopedThreadKey, scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { deriveThreadTitleSeed } from "@t3tools/client-runtime/operations";
 import { settlePromise, squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
@@ -21,6 +21,7 @@ import type { ComposerHandleRef } from "../../composerHandleContext";
 import { releaseDraftAttachments } from "../../lib/attachmentUploadQueue";
 import type { buildMessageContext } from "../../lib/composerContextRecords";
 import { appAtomRegistry } from "../../rpc/atomRegistry";
+import { useSidebarTagsStore } from "../../sidebarTagsStore";
 import { threadEnvironment } from "../../state/threads";
 import { useOrchestrationCommand } from "../../state/use-orchestration-command";
 import { buildThreadRouteParams } from "../../threadRoutes";
@@ -158,8 +159,8 @@ export function useMultipleModelSend(input: MultipleModelSendInput) {
             ]),
             model: target.selection.model,
             uncertainSubmissions: uncertainSubmissionsRef.current,
-            start: (targetThreadId) => {
-              return startThreadTurn({
+            start: async (targetThreadId) => {
+              const result = await startThreadTurn({
                 environmentId,
                 input: {
                   threadId: targetThreadId,
@@ -198,6 +199,14 @@ export function useMultipleModelSend(input: MultipleModelSendInput) {
                   createdAt: createdAt,
                 },
               });
+              if (result._tag === "Success" && draftId) {
+                useSidebarTagsStore
+                  .getState()
+                  .applyDraftTags(draftId, [
+                    scopedThreadKey(scopeThreadRef(environmentId, targetThreadId)),
+                  ]);
+              }
+              return result;
             },
             openThread: (threadId) =>
               void navigate({
@@ -213,6 +222,10 @@ export function useMultipleModelSend(input: MultipleModelSendInput) {
       resetLocalDispatch();
       releasedComposer = true;
       await starts;
+      // Failed models keep the draft, and its tags, for the retry.
+      if (failedSelections.length === 0 && draftId) {
+        useSidebarTagsStore.getState().clearDraftTags(draftId);
+      }
       if (startedCount > 0) {
         toastManager.add(
           stackedThreadToast({

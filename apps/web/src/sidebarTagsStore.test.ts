@@ -138,6 +138,30 @@ describe("useSidebarTagsStore", () => {
     expect(store.getState().tagsByThreadKey[threadKey]).toEqual(["Shipping"]);
   });
 
+  it("holds a new chat's tags on its draft and applies them to each thread it creates", async () => {
+    const { store, connect } = await setup();
+    connect(first);
+    store.getState().setDraftTag("draft", "Shipping", true);
+    store.getState().setDraftTag("draft", "later", true);
+    store.getState().setDraftTag("draft", "shipping", true);
+    store.getState().setDraftTag("draft", "LATER", false);
+    expect(store.getState().draftTags.draft).toEqual(["shipping"]);
+    // Nothing reaches the server until a thread exists.
+    expect(state.sent).toEqual([]);
+
+    // A multi-model send creates its threads one at a time; the second reuses the new tag.
+    store.getState().applyDraftTags("draft", [`${first}:a`]);
+    store.getState().applyDraftTags("draft", [`${first}:b`]);
+    store.getState().clearDraftTags("draft");
+    expect(store.getState().tagsByThreadKey).toEqual({
+      [`${first}:a`]: ["shipping"],
+      [`${first}:b`]: ["shipping"],
+    });
+    expect(store.getState().draftTags).toEqual({});
+    await vi.waitFor(() => expect(state.sent).toHaveLength(3));
+    expect(state.sent.filter(({ input }) => input.action === "create")).toHaveLength(1);
+  });
+
   it("tags several threads with a new tag in one create and one tagging", async () => {
     const { store, connect } = await setup();
     connect(first, second);

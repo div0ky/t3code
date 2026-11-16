@@ -1,3 +1,4 @@
+import { useSidebarTagsStore } from "../../sidebarTagsStore";
 import { isClearComposerCommand, parseSideChatCommand } from "@t3tools/shared/composerTrigger";
 import { armFreshSession, disarmFreshSession, readFreshSessionArm } from "./freshSessionArms";
 import {
@@ -1272,6 +1273,13 @@ export function useComposerSend(input: ComposerSendInput) {
         failure = startResult;
       } else {
         turnStartSucceeded = true;
+        if (isLocalDraftThread && draftId) {
+          const draftTags = useSidebarTagsStore.getState();
+          draftTags.applyDraftTags(draftId, [
+            scopedThreadKey(scopeThreadRef(environmentId, threadIdForSend)),
+          ]);
+          draftTags.clearDraftTags(draftId);
+        }
         setKeepFullHistory(routeThreadKey, false);
         if (freshArm !== undefined) disarmFreshSession(routeThreadKey, freshArm);
         clearUsageLimitsFor(routeThreadKey);

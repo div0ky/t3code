@@ -7,12 +7,15 @@ import { Input } from "./ui/input";
 import { Popover, PopoverPopup } from "./ui/popover";
 
 type Request = {
-  readonly threadKeys: readonly string[];
   readonly position: { readonly x: number; readonly y: number };
-};
+} & (
+  | { readonly threadKeys: readonly string[] }
+  // A new chat has no thread yet, so its tags wait on the draft.
+  | { readonly draftId: string }
+);
 const useRequest = create<{ request: Request | null }>(() => ({ request: null }));
 
-/** Opens the tag picker for these threads at a point, such as where their menu was opened. */
+/** Opens the tag picker for these threads, or a new chat's draft, at a point on screen. */
 export function openThreadTagPicker(request: Request) {
   useRequest.setState({ request });
 }
@@ -32,9 +35,20 @@ export function ThreadTagPickerHost() {
 
 /** Stays open while tags are toggled, so several go on in one visit. */
 function ThreadTagPicker({ request }: { request: Request }) {
-  const { threadKeys, position } = request;
-  const tags = useSidebarTagsStore((store) => store.tags);
+  const { position } = request;
+  const draftId = "draftId" in request ? request.draftId : null;
+  const threadKeys = "threadKeys" in request ? request.threadKeys : [];
+  const targetCount = draftId === null ? threadKeys.length : 1;
+  const storedTags = useSidebarTagsStore((store) => store.tags);
   const tagsByThreadKey = useSidebarTagsStore((store) => store.tagsByThreadKey);
+  const draftTags = useSidebarTagsStore((store) =>
+    draftId === null ? undefined : store.draftTags[draftId],
+  );
+  // A tag first named on a draft is not in the store until the chat is sent.
+  const tags = [
+    ...storedTags,
+    ...(draftTags ?? []).filter((tag) => !storedTags.some((stored) => sameTag(stored, tag))),
+  ];
   const [query, setQuery] = useState("");
   const [anchor] = useState(() => ({
     getBoundingClientRect: () => new DOMRect(position.x, position.y, 0, 0),
@@ -43,12 +57,17 @@ function ThreadTagPicker({ request }: { request: Request }) {
   const shown = tags.filter((tag) => tag.toLocaleLowerCase().includes(name.toLocaleLowerCase()));
   const exact = tags.find((tag) => sameTag(tag, name));
   const taggedCount = (tag: string) =>
-    threadKeys.filter((key) => tagsByThreadKey[key]?.includes(tag)).length;
+    draftId === null
+      ? threadKeys.filter((key) => tagsByThreadKey[key]?.includes(tag)).length
+      : draftTags?.some((draftTag) => sameTag(draftTag, tag))
+        ? 1
+        : 0;
+  const setTag = (tag: string, tagged: boolean) =>
+    draftId === null
+      ? useSidebarTagsStore.getState().setThreadsTag(threadKeys, tag, tagged)
+      : useSidebarTagsStore.getState().setDraftTag(draftId, tag, tagged);
   // A tag only some threads have goes onto the rest first; a second click takes it off them all.
-  const toggle = (tag: string) =>
-    useSidebarTagsStore
-      .getState()
-      .setThreadsTag(threadKeys, tag, taggedCount(tag) < threadKeys.length);
+  const toggle = (tag: string) => setTag(tag, taggedCount(tag) < targetCount);
   return (
     <Popover
       open
@@ -62,7 +81,7 @@ function ThreadTagPicker({ request }: { request: Request }) {
         side="bottom"
         padding="compact"
         width="sm"
-        aria-label={threadKeys.length > 1 ? `Tags for ${threadKeys.length} threads` : "Tags"}
+        aria-label={targetCount > 1 ? `Tags for ${targetCount} threads` : "Tags"}
       >
         <div className="flex flex-col gap-2">
           <Input
@@ -79,7 +98,7 @@ function ThreadTagPicker({ request }: { request: Request }) {
               event.preventDefault();
               const match = exact ?? (shown.length === 1 ? shown[0] : undefined);
               if (match === undefined) {
-                useSidebarTagsStore.getState().setThreadsTag(threadKeys, name, true);
+                setTag(name, true);
               } else {
                 toggle(match);
               }
@@ -93,8 +112,8 @@ function ThreadTagPicker({ request }: { request: Request }) {
                 <li key={tag}>
                   <label className="flex min-h-8 cursor-pointer items-center gap-2 rounded-sm px-2 py-1 text-sm hover:bg-accent sm:min-h-7">
                     <Checkbox
-                      checked={count === threadKeys.length}
-                      indeterminate={count > 0 && count < threadKeys.length}
+                      checked={count === targetCount}
+                      indeterminate={count > 0 && count < targetCount}
                       onCheckedChange={() => toggle(tag)}
                     />
                     <span className="min-w-0 truncate">{tag}</span>
