@@ -377,9 +377,9 @@ it.layer(Layer.provideMerge(layerTools, layerOrchestration))("work a link starts
         "capability_denied",
       );
 
-      // Nor folders, for the same reason.
+      // Nor tags, for the same reason.
       assert.equal(
-        failureCode(yield* call(laptop, "t3_folder_organize", { action: "create", name: "Work" })),
+        failureCode(yield* call(laptop, "t3_tag_organize", { action: "create", name: "Work" })),
         "capability_denied",
       );
 

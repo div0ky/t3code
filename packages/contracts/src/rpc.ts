@@ -362,7 +362,7 @@ import {
   ServerSettings,
   ServerSettingsError,
   ServerSettingsPatch,
-  SidebarFolderOperation,
+  SidebarTagOperation,
   ListTextGeneratorModelsInput,
   ListTextGeneratorModelsResult,
   TextGeneratorError,
@@ -523,7 +523,7 @@ export const WS_METHODS = {
   peerLinksUnlink: "peerLinks.unlink",
   peerLinksAnswerRequest: "peerLinks.answerRequest",
   serverUpdateSettings: "server.updateSettings",
-  serverUpdateSidebarFolders: "server.updateSidebarFolders",
+  serverUpdateSidebarTags: "server.updateSidebarTags",
   serverDiscoverSourceControl: "server.discoverSourceControl",
   serverSearchAcpRegistry: "server.searchAcpRegistry",
   serverPrepareAcpRegistryAgent: "server.prepareAcpRegistryAgent",
@@ -856,8 +856,8 @@ const WsServerUpdateSettingsRpc = Rpc.make(WS_METHODS.serverUpdateSettings, {
   error: Schema.Union([ServerSettingsError, EnvironmentAuthorizationError]),
 });
 
-const WsServerUpdateSidebarFoldersRpc = Rpc.make(WS_METHODS.serverUpdateSidebarFolders, {
-  payload: SidebarFolderOperation,
+const WsServerUpdateSidebarTagsRpc = Rpc.make(WS_METHODS.serverUpdateSidebarTags, {
+  payload: SidebarTagOperation,
   error: Schema.Union([ServerSettingsError, EnvironmentAuthorizationError]),
 });
 
@@ -2098,7 +2098,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsServerGetDatabaseStorageRpc,
   WsServerReclaimDatabaseSpaceRpc,
   WsServerUpdateSettingsRpc,
-  WsServerUpdateSidebarFoldersRpc,
+  WsServerUpdateSidebarTagsRpc,
   WsPeerLinksListRpc,
   WsPeerLinksLinkRpc,
   WsPeerLinksUnlinkRpc,

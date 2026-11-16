@@ -22,7 +22,7 @@ import {
   ServerSettings,
   ServerSettingsPatch,
   withIdleCompaction,
-  applySidebarFolderOperation,
+  applySidebarTagOperation,
 } from "./settings.ts";
 
 const decodeClientSettings = Schema.decodeUnknownSync(ClientSettingsSchema);
@@ -540,68 +540,43 @@ describe("server model preferences", () => {
   });
 });
 
-describe("applySidebarFolderOperation", () => {
+describe("applySidebarTagOperation", () => {
   const threadA = ThreadId.make("a");
   const threadB = ThreadId.make("b");
-  const folders = [
+  const tags = [
     { id: "work", name: "Work", threadIds: [threadA, threadB] },
     { id: "home", name: "Home", threadIds: [] },
   ];
 
-  it("moves threads out of their old folder, and out of all folders for null", () => {
+  it("tags a thread without taking it off its other tags, once", () => {
+    const tagged = applySidebarTagOperation(tags, {
+      action: "tag_threads",
+      tagId: "home",
+      threadIds: [threadA],
+    });
+    expect(tagged).toEqual([tags[0], { id: "home", name: "Home", threadIds: [threadA] }]);
     expect(
-      applySidebarFolderOperation(folders, {
-        action: "move_threads",
+      applySidebarTagOperation(tagged, {
+        action: "tag_threads",
+        tagId: "home",
         threadIds: [threadA],
-        folderId: "home",
       }),
-    ).toEqual([
-      { id: "work", name: "Work", threadIds: [threadB] },
-      { id: "home", name: "Home", threadIds: [threadA] },
-    ]);
-    expect(
-      applySidebarFolderOperation(folders, {
-        action: "move_threads",
-        threadIds: [threadA, threadB],
-        folderId: null,
-      })[0]?.threadIds,
-    ).toEqual([]);
+    ).toEqual(tagged);
   });
 
-  it("keeps threads where they are when the target folder is gone", () => {
+  it("untags only the named tag", () => {
     expect(
-      applySidebarFolderOperation(folders, {
-        action: "move_threads",
+      applySidebarTagOperation(tags, {
+        action: "untag_threads",
+        tagId: "work",
         threadIds: [threadA],
-        folderId: "deleted",
       }),
-    ).toBe(folders);
+    ).toEqual([{ id: "work", name: "Work", threadIds: [threadB] }, tags[1]]);
   });
 
-  it("reorders folders without losing threads and safely replays the move", () => {
-    const move = { action: "reorder" as const, folderId: "home", beforeFolderId: "work" };
-    const reordered = applySidebarFolderOperation(folders, move);
-    expect(reordered).toEqual([folders[1], folders[0]]);
-    expect(applySidebarFolderOperation(reordered, move)).toEqual(reordered);
-    expect(
-      applySidebarFolderOperation(reordered, {
-        action: "reorder",
-        folderId: "home",
-        beforeFolderId: null,
-      }),
-    ).toEqual(folders);
-    expect(
-      applySidebarFolderOperation(folders, {
-        action: "reorder",
-        folderId: "home",
-        beforeFolderId: "deleted",
-      }),
-    ).toBe(folders);
-  });
-
-  it("does not duplicate a folder when create is retried", () => {
-    expect(
-      applySidebarFolderOperation(folders, { action: "create", folderId: "work", name: "Again" }),
-    ).toBe(folders);
+  it("does not duplicate a tag when create is retried", () => {
+    expect(applySidebarTagOperation(tags, { action: "create", tagId: "work", name: "Again" })).toBe(
+      tags,
+    );
   });
 });

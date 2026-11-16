@@ -169,39 +169,44 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
       assert.deepEqual(settings.providerModelPreferences?.[provider]?.modelOrder, ["luna", "sol"]);
     }).pipe(Effect.provide(layerServerSettings())),
   );
-  it.effect("keeps every concurrent folder move and persists the result", () =>
+  it.effect("keeps every concurrent tagging and persists the result", () =>
     Effect.gen(function* () {
       const service = yield* ServerSettingsModule.ServerSettingsService;
       const threadIds = ["a", "b", "c", "d"].map((id) => ThreadId.make(id));
-      yield* service.updateSidebarFolders({ action: "create", folderId: "work", name: "Work" });
+      yield* service.updateSidebarTags({ action: "create", tagId: "work", name: "Work" });
       yield* Effect.forEach(
         threadIds,
         (threadId) =>
-          service.updateSidebarFolders({
-            action: "move_threads",
+          service.updateSidebarTags({
+            action: "tag_threads",
             threadIds: [threadId],
-            folderId: "work",
+            tagId: "work",
           }),
         { concurrency: "unbounded" },
       );
-      const { sidebarFolders } = yield* service.getSettings;
-      assert.deepEqual(sidebarFolders[0]?.threadIds.toSorted(), threadIds);
-      yield* service.updateSidebarFolders({ action: "create", folderId: "home", name: "Home" });
-      yield* service.updateSidebarFolders({
-        action: "reorder",
-        folderId: "home",
-        beforeFolderId: "work",
-      });
-      const reordered = yield* service.getSettings;
-      assert.deepEqual(
-        reordered.sidebarFolders.map((folder) => folder.id),
-        ["home", "work"],
-      );
-      assert.deepEqual(reordered.sidebarFolders[1]?.threadIds.toSorted(), threadIds);
+      const { sidebarTags } = yield* service.getSettings;
+      assert.deepEqual(sidebarTags[0]?.threadIds.toSorted(), threadIds);
       const config = yield* ServerConfig.ServerConfig;
       const fs = yield* FileSystem.FileSystem;
       const saved = yield* decodeServerSettingsJson(yield* fs.readFileString(config.settingsPath));
-      assert.deepEqual(saved.sidebarFolders, reordered.sidebarFolders);
+      assert.deepEqual(saved.sidebarTags, sidebarTags);
+    }).pipe(Effect.provide(layerServerSettings())),
+  );
+  it.effect("loads folders saved before tags as tags and keeps them through a save", () =>
+    Effect.gen(function* () {
+      const config = yield* ServerConfig.ServerConfig;
+      const fs = yield* FileSystem.FileSystem;
+      const service = yield* ServerSettingsModule.ServerSettingsService;
+      const work = { id: "work", name: "Work", threadIds: [ThreadId.make("a")] };
+      yield* fs.writeFileString(config.settingsPath, JSON.stringify({ sidebarFolders: [work] }));
+
+      assert.deepEqual((yield* service.getSettings).sidebarTags, [work]);
+      yield* service.updateSidebarTags({ action: "create", tagId: "home", name: "Home" });
+      const written = yield* fs.readFileString(config.settingsPath);
+      const saved = yield* decodeServerSettingsJson(written);
+      assert.deepEqual(saved.sidebarTags, [work, { id: "home", name: "Home", threadIds: [] }]);
+      // The old key is gone, so deleting every tag cannot bring the folders back.
+      assert.notInclude(written, "sidebarFolders");
     }).pipe(Effect.provide(layerServerSettings())),
   );
   it.effect("persists and broadcasts model preferences to other connected clients", () =>

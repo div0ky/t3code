@@ -42,7 +42,6 @@ import { observeIntersection } from "../lib/observeIntersection";
 import { deadlineAfter, deadlineStore } from "@t3tools/client-runtime/clock";
 import { useDeadlinePassed } from "../hooks/useDeadline";
 import { legacyProjectCwdPreferenceKey } from "../uiStateStore";
-import type { SidebarFolder } from "../sidebarFoldersStore";
 
 export function shouldNavigateAfterThreadPark(input: {
   readonly threadKey: string;
@@ -197,20 +196,7 @@ export type SidebarListMarker =
   | "pinned-divider"
   | "working-header"
   | "snoozed-header"
-  | "settled-header"
-  | `folder:${string}`;
-
-const SIDEBAR_FOLDER_MARKER_PREFIX = "folder:";
-
-export function sidebarFolderMarker(folderId: string): SidebarListMarker {
-  return `${SIDEBAR_FOLDER_MARKER_PREFIX}${folderId}`;
-}
-
-export function sidebarFolderIdOfMarker(marker: SidebarListMarker): string | null {
-  return marker.startsWith(SIDEBAR_FOLDER_MARKER_PREFIX)
-    ? marker.slice(SIDEBAR_FOLDER_MARKER_PREFIX.length)
-    : null;
-}
+  | "settled-header";
 
 export function sidebarMarkerId(marker: SidebarListMarker): string {
   return `${SIDEBAR_MARKER_PREFIX}${marker}`;
@@ -243,16 +229,7 @@ export type SidebarDropTarget = {
   readonly section: "pinned" | "active" | "settled";
   readonly pinnedOrder: readonly string[];
   readonly activeOrder: readonly string[];
-  /** The folder a drop lands in; null is the unfiled list. Only meaningful in the active section. */
-  readonly folderId: string | null;
-  /** The active region as drawn after the drop, folder headers included. Empty without folders. */
-  readonly activeSlots: readonly SidebarListItem[];
-  /** The thread rows sharing the drop's folder, in drawn order. */
-  readonly folderSiblings: readonly string[];
 };
-
-const isSidebarFolderItem = (item: SidebarListItem | undefined) =>
-  item?.kind === "marker" && sidebarFolderIdOfMarker(item.marker) !== null;
 
 export function resolveSidebarDropTarget(
   items: readonly SidebarListItem[],
@@ -263,13 +240,9 @@ export function resolveSidebarDropTarget(
   const overIndex = items.findIndex((item) => sidebarListItemId(item) === overId);
   if (activeIndex === -1 || overIndex === -1 || items[activeIndex]?.kind !== "thread") return null;
   const moved = items.filter((_, index) => index !== activeIndex);
-  // A folder header always means "into this folder", from either direction, so a collapsed folder
-  // accepts drops from below too.
   const overItem = items[overIndex];
   if (overItem?.kind === "marker" && overItem.marker === "urgent-header") return null;
-  const dropsBelowOver =
-    isSidebarFolderItem(overItem) ||
-    (overItem?.kind === "marker" && overItem.marker === "pinned-header");
+  const dropsBelowOver = overItem?.kind === "marker" && overItem.marker === "pinned-header";
   const slot = dropsBelowOver
     ? moved.findIndex((item) => sidebarListItemId(item) === overId) + 1
     : overIndex;
@@ -293,67 +266,7 @@ export function resolveSidebarDropTarget(
     } else if (currentSection === "pinned") pinnedOrder.push(item.key);
     else if (currentSection === "active") activeOrder.push(item.key);
   }
-  const hasFolders = items.some(isSidebarFolderItem);
-  const dividerIndex = moved.findIndex(
-    (item) => item.kind === "marker" && item.marker === "pinned-divider",
-  );
-  const activeEnd = moved.findIndex(
-    (item, index) =>
-      index > dividerIndex &&
-      item.kind === "marker" &&
-      (item.marker === "working-header" ||
-        item.marker === "snoozed-header" ||
-        item.marker === "settled-header"),
-  );
-  const activeSlots = hasFolders
-    ? moved.slice(dividerIndex + 1, activeEnd === -1 ? moved.length : activeEnd)
-    : [];
-  const folderHeaderAt = (index: number) => {
-    for (let i = index - 1; i > dividerIndex; i -= 1) {
-      const item = moved[i]!;
-      if (item.kind === "marker" && sidebarFolderIdOfMarker(item.marker) !== null) return i;
-    }
-    return -1;
-  };
-  const headerIndex = folderHeaderAt(slot);
-  const header = moved[headerIndex];
-  const folderId = header?.kind === "marker" ? sidebarFolderIdOfMarker(header.marker) : null;
-  const folderSiblings = activeSlots.flatMap((item, index) =>
-    item.kind === "thread" && folderHeaderAt(dividerIndex + 1 + index) === headerIndex
-      ? [item.key]
-      : [],
-  );
-  return { section, pinnedOrder, activeOrder, folderId, activeSlots, folderSiblings };
-}
-
-/**
- * Folders draw active rows grouped, but the server keeps one active order. Keep that order and move
- * the thread next to its new neighbour, so a drop rewrites one key and each folder's order follows.
- */
-export function resolveFolderDropOrder<T extends SidebarDropTarget>(
-  target: T,
-  serverOrder: readonly string[],
-  activeKey: string,
-  excludedKeys?: ReadonlySet<string>,
-): T {
-  if (target.section !== "active") return target;
-  if (target.activeSlots.length === 0)
-    return {
-      ...target,
-      activeOrder: target.activeOrder.filter((key) => !excludedKeys?.has(key)),
-    };
-  const position = target.folderSiblings.indexOf(activeKey);
-  const next = target.folderSiblings[position + 1];
-  const previous = target.folderSiblings[position - 1];
-  const order = serverOrder.filter((key) => key !== activeKey);
-  const anchor =
-    next !== undefined
-      ? order.indexOf(next)
-      : previous !== undefined && order.includes(previous)
-        ? order.indexOf(previous) + 1
-        : -1;
-  order.splice(anchor === -1 ? Math.max(serverOrder.indexOf(activeKey), 0) : anchor, 0, activeKey);
-  return { ...target, activeOrder: order.filter((key) => !excludedKeys?.has(key)) };
+  return { section, pinnedOrder, activeOrder };
 }
 
 export function placeSidebarPins<T extends { readonly globallyPinned?: boolean }>(
@@ -363,27 +276,6 @@ export function placeSidebarPins<T extends { readonly globallyPinned?: boolean }
   return {
     pinnedThreads: pinned.filter((thread) => thread.globallyPinned === true),
     activeThreads: [...pinned.filter((thread) => thread.globallyPinned !== true), ...active],
-  };
-}
-
-export function groupThreadsBySidebarFolder<T>(input: {
-  readonly threads: readonly T[];
-  readonly folders: readonly SidebarFolder[];
-  readonly folderIdByThreadKey: Readonly<Record<string, string>>;
-  readonly keyOf: (thread: T) => string;
-}) {
-  const threadsByFolderId = new Map<string, T[]>(input.folders.map((folder) => [folder.id, []]));
-  const unfiled: T[] = [];
-  for (const thread of input.threads) {
-    const folderId = input.folderIdByThreadKey[input.keyOf(thread)];
-    (folderId === undefined ? unfiled : (threadsByFolderId.get(folderId) ?? unfiled)).push(thread);
-  }
-  return {
-    unfiled,
-    folders: input.folders.map((folder) => ({
-      folder,
-      threads: threadsByFolderId.get(folder.id) ?? [],
-    })),
   };
 }
 

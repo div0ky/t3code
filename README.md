@@ -1,6 +1,6 @@
 # D5 Code
 
-D5 Code is a personal fork of [T3 Code](https://github.com/pingdotgg/t3code), an "agent harness control surface" for the coding agents on your machine. It adds sidebar thread folders and installs beside official T3 Code builds without sharing state.
+D5 Code is a personal fork of [T3 Code](https://github.com/pingdotgg/t3code), an "agent harness control surface" for the coding agents on your machine. It adds sidebar thread tags and installs beside official T3 Code builds without sharing state.
 
 T3 Code is MIT licensed, and its copyright notice stays in [LICENSE](./LICENSE). D5 Code is not affiliated with or endorsed by the T3 Code team.
 

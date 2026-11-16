@@ -12,36 +12,35 @@ const key = (environmentId: EnvironmentId, id: string) =>
 describe("planLegacySidebarFolderImport", () => {
   const legacy = {
     folders: [
-      { id: "mixed", name: "Mixed", collapsed: true },
-      { id: "empty", name: "Empty", collapsed: false },
+      { id: "mixed", name: "Mixed" },
+      { id: "empty", name: "Empty" },
     ],
     folderIdByThreadKey: { [key(primary, "a")]: "mixed", [key(remote, "b")]: "mixed" },
     importedEnvironmentIds: [],
   };
 
-  it("splits a cross-environment folder and finishes when every environment has imported", () => {
+  it("splits a cross-environment folder into tags and finishes when every environment has imported", () => {
     const first = planLegacySidebarFolderImport(legacy, primary, primary);
     expect(first.operations).toEqual([
-      { action: "create", folderId: "mixed:primary", name: "Mixed" },
-      { action: "move_threads", threadIds: ["a"], folderId: "mixed:primary" },
-      { action: "create", folderId: "empty:primary", name: "Empty" },
+      { action: "create", tagId: "mixed:primary", name: "Mixed" },
+      { action: "tag_threads", threadIds: ["a"], tagId: "mixed:primary" },
+      { action: "create", tagId: "empty:primary", name: "Empty" },
     ]);
-    expect(first.collapsedFolderIds).toEqual(["mixed:primary"]);
     expect(first.remaining?.folderIdByThreadKey).toEqual({ [key(remote, "b")]: "mixed" });
 
     const second = planLegacySidebarFolderImport(first.remaining!, remote, primary);
     expect(second.operations).toEqual([
-      { action: "create", folderId: "mixed:remote", name: "Mixed" },
-      { action: "move_threads", threadIds: ["b"], folderId: "mixed:remote" },
+      { action: "create", tagId: "mixed:remote", name: "Mixed" },
+      { action: "tag_threads", threadIds: ["b"], tagId: "mixed:remote" },
     ]);
     expect(second.remaining).toBeNull();
   });
 
-  it("gives each environment its own folder id even if the home environment changes", () => {
+  it("gives each environment its own tag id even if the home environment changes", () => {
     const first = planLegacySidebarFolderImport(legacy, primary, primary);
     const second = planLegacySidebarFolderImport(first.remaining!, remote, remote);
     const ids = [...first.operations, ...second.operations].flatMap((operation) =>
-      operation.action === "create" ? [operation.folderId] : [],
+      operation.action === "create" ? [operation.tagId] : [],
     );
     expect(new Set(ids).size).toBe(ids.length);
   });

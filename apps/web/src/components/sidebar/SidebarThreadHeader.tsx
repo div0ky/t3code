@@ -1,4 +1,4 @@
-import { FolderClosedIcon, FolderPlusIcon, SearchIcon, SquarePenIcon, XIcon } from "lucide-react";
+import { FolderPlusIcon, SearchIcon, SquarePenIcon, XIcon } from "lucide-react";
 import {
   type ComponentProps,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -16,7 +16,7 @@ export interface SidebarThreadHeaderProps {
   hasProjects: boolean;
   projectScope: ReactNode;
   onNewProject: () => void;
-  onNewFolder: (() => void) | null;
+  tagFilter: ReactNode;
   onNewThread: (event: ReactMouseEvent) => void;
   newThreadDisabled: boolean;
   newThreadShortcutLabel: string | null | undefined;
@@ -36,7 +36,7 @@ export function SidebarThreadHeader({
   hasProjects,
   projectScope,
   onNewProject,
-  onNewFolder,
+  tagFilter,
   onNewThread,
   newThreadDisabled,
   newThreadShortcutLabel,
@@ -107,11 +107,7 @@ export function SidebarThreadHeader({
             </SidebarHeaderIconButton>
           </>
         ) : null}
-        {onNewFolder ? (
-          <SidebarHeaderIconButton label="New folder" onClick={onNewFolder}>
-            <FolderClosedIcon />
-          </SidebarHeaderIconButton>
-        ) : null}
+        {tagFilter}
         <SidebarHeaderIconButton
           label="New thread"
           tooltip={

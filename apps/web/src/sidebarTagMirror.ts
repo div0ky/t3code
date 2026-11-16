@@ -1,27 +1,27 @@
 import {
-  applySidebarFolderOperation,
+  applySidebarTagOperation,
   type EnvironmentId,
-  type SidebarFolder,
-  type SidebarFolderOperation,
+  type SidebarTag,
+  type SidebarTagOperation,
 } from "@t3tools/contracts";
 
 interface PendingOperation {
-  readonly operation: SidebarFolderOperation;
+  readonly operation: SidebarTagOperation;
   acknowledged: boolean;
 }
 
 /**
- * Server folders with this client's unconfirmed operations on top. A snapshot can land before or
+ * Server tags with this client's unconfirmed operations on top. A snapshot can land before or
  * after its acknowledgement, so an acknowledged operation stays applied until the next snapshot.
  */
-export function createSidebarFolderMirror() {
-  const server = new Map<EnvironmentId, readonly SidebarFolder[]>();
+export function createSidebarTagMirror() {
+  const server = new Map<EnvironmentId, readonly SidebarTag[]>();
   const pending = new Map<EnvironmentId, readonly PendingOperation[]>();
   return {
     /** Returns whether this snapshot changed anything. */
-    receive: (environmentId: EnvironmentId, folders: readonly SidebarFolder[]) => {
-      if (server.get(environmentId) === folders) return false;
-      server.set(environmentId, folders);
+    receive: (environmentId: EnvironmentId, tags: readonly SidebarTag[]) => {
+      if (server.get(environmentId) === tags) return false;
+      server.set(environmentId, tags);
       pending.set(
         environmentId,
         (pending.get(environmentId) ?? []).filter((entry) => !entry.acknowledged),
@@ -39,7 +39,7 @@ export function createSidebarFolderMirror() {
       }
       return changed;
     },
-    begin: (environmentId: EnvironmentId, operation: SidebarFolderOperation) => {
+    begin: (environmentId: EnvironmentId, operation: SidebarTagOperation) => {
       const entry: PendingOperation = { operation, acknowledged: false };
       if (!server.has(environmentId)) server.set(environmentId, []);
       pending.set(environmentId, [...(pending.get(environmentId) ?? []), entry]);
@@ -54,14 +54,14 @@ export function createSidebarFolderMirror() {
         (pending.get(environmentId) ?? []).filter((candidate) => candidate !== entry),
       );
     },
-    folders: () =>
+    tags: () =>
       [...server].map(
-        ([environmentId, folders]) =>
+        ([environmentId, tags]) =>
           [
             environmentId,
             (pending.get(environmentId) ?? []).reduce(
-              (current, { operation }) => applySidebarFolderOperation(current, operation),
-              folders,
+              (current, { operation }) => applySidebarTagOperation(current, operation),
+              tags,
             ),
           ] as const,
       ),
