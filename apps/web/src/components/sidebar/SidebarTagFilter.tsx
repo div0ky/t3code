@@ -1,7 +1,7 @@
 import type { EnvironmentId } from "@t3tools/contracts";
 import { TagIcon } from "lucide-react";
 
-import { useSidebarTagsStore } from "../../sidebarTagsStore";
+import { describeTagFilter, useSidebarTagsStore } from "../../sidebarTagsStore";
 import { requestTagName } from "../TagNameDialog";
 import {
   Menu,
@@ -10,6 +10,8 @@ import {
   MenuGroupLabel,
   MenuItem,
   MenuPopup,
+  MenuRadioGroup,
+  MenuRadioItem,
   MenuSeparator,
   MenuSub,
   MenuSubPopup,
@@ -26,6 +28,7 @@ export function SidebarTagFilter(props: {
 }) {
   const tags = useSidebarTagsStore((store) => store.tags);
   const filter = useSidebarTagsStore((store) => store.filter);
+  const filterMode = useSidebarTagsStore((store) => store.filterMode);
   const actions = () => useSidebarTagsStore.getState();
   return (
     <Menu>
@@ -34,7 +37,7 @@ export function SidebarTagFilter(props: {
           <SidebarHeaderIconButton
             label={
               filter.length > 0
-                ? `Filter threads by tag: ${filter.join(", ")}`
+                ? `Filter threads by tag: ${describeTagFilter(filter, filterMode)}`
                 : "Filter threads by tag"
             }
           />
@@ -70,6 +73,28 @@ export function SidebarTagFilter(props: {
             </MenuCheckboxItem>
           ))}
         </MenuGroup>
+        {tags.length > 1 ? (
+          <>
+            <MenuSeparator />
+            <MenuGroup>
+              <MenuGroupLabel>Match</MenuGroupLabel>
+              <MenuRadioGroup
+                value={filterMode}
+                onValueChange={(mode) => {
+                  actions().setFilterMode(mode);
+                  props.onFilterChange();
+                }}
+              >
+                <MenuRadioItem value="any" closeOnClick={false}>
+                  Any tag (OR)
+                </MenuRadioItem>
+                <MenuRadioItem value="all" closeOnClick={false}>
+                  All tags (AND)
+                </MenuRadioItem>
+              </MenuRadioGroup>
+            </MenuGroup>
+          </>
+        ) : null}
         <MenuSeparator />
         <MenuItem
           disabled={filter.length === 0}

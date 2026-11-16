@@ -159,7 +159,8 @@ create new ones from **Tags**.
 
 Use the tag button next to the search box to choose which tags to show. Pick one or more and the
 sidebar lists only threads with any of them, in every section, and search looks only within
-them. The button shows a dot while a filter is on; choose **Show all threads** to clear it. The thread you have open stays listed even
+them. Under **Match**, switch from **Any tag (OR)** to **All tags (AND)** to list only threads that have
+every tag you picked. The button shows a dot while a filter is on; choose **Show all threads** to clear it. The thread you have open stays listed even
 when it has none of the chosen tags, so a new thread does not vanish before you tag it. While a
 tag filter is on, the Settled section lists only the settled threads this device already holds,
 not older ones it would load on request.
@@ -168,7 +169,7 @@ The same menu creates, renames, and deletes tags. Deleting a tag keeps its threa
 
 Tags are saved on the environment, so every web and desktop client connected to it sees the same
 ones, and agents can tag threads for you. Tags with the same name in different environments act as
-one tag. Which tags you filter by is saved per device. Folders you made before tags existed
+one tag. Which tags you filter by, and how they match, is saved per device. Folders you made before tags existed
 become tags with the same names and threads.
 
 ### Fold working threads (beta)
