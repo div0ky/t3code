@@ -9,7 +9,7 @@ import {
 } from "./chat/threadContextDrag";
 import { discardComposerDraft } from "../lib/discardComposerDraft";
 import { requestCustomSnooze } from "./CustomSnoozeDialog";
-import { requestTagName } from "./TagNameDialog";
+import { openThreadTagPicker } from "./ThreadTagPicker";
 import { useAtomValue } from "@effect/atom-react";
 import * as Option from "effect/Option";
 import { Atom } from "effect/reactivity";
@@ -760,37 +760,6 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
     visibleThreads: visible,
     snoozeNow: preciseNow,
   };
-}
-
-/** A Tags submenu for these threads. A tag is checked when every one of them has it. */
-function tagMenuItem(threadKeys: readonly string[], label: string) {
-  const { tags, tagsByThreadKey } = useSidebarTagsStore.getState();
-  return {
-    id: "tags" as const,
-    label,
-    icon: "tag",
-    children: [
-      ...tags.map((name) => ({
-        id: `tag:${name}` as const,
-        label: name,
-        checked: threadKeys.every((key) => tagsByThreadKey[key]?.includes(name)),
-      })),
-      { id: "tag:" as const, label: "New tag…", separatorBefore: tags.length > 0 },
-    ],
-  };
-}
-
-/** Applies a click in `tagMenuItem`'s submenu. Returns false when the click was something else. */
-async function applyTagMenuChoice(threadKeys: readonly string[], choice: string) {
-  if (!choice.startsWith("tag:")) return false;
-  const picked = choice.slice("tag:".length);
-  const name = picked || (await requestTagName({ title: "New tag" }));
-  if (name === null) return true;
-  const { tagsByThreadKey, setThreadsTag } = useSidebarTagsStore.getState();
-  const everyTagged =
-    picked !== "" && threadKeys.every((key) => tagsByThreadKey[key]?.includes(name));
-  setThreadsTag(threadKeys, name, !everyTagged);
-  return true;
 }
 
 const NO_OLDER_SETTLED_SCOPES: ReadonlyArray<OlderSettledScope> = [];
@@ -2482,7 +2451,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                   },
                 ]
               : []),
-            tagMenuItem(threadKeys, `Tags (${count})`),
+            { id: "tags", label: `Tags… (${count})`, icon: "tag" },
             { id: "mark-unread", label: `Mark unread (${count})` },
             {
               id: "delete",
@@ -2495,7 +2464,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         ),
       );
       if (clicked._tag === "Failure" || clicked.value === null) return;
-      if (await applyTagMenuChoice(threadKeys, clicked.value)) return;
+      if (clicked.value === "tags") {
+        openThreadTagPicker({ threadKeys, position });
+        return;
+      }
       const actionTargets =
         clicked.value === "unpin"
           ? pinnedSelectedThreads
@@ -2783,13 +2755,18 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               snoozePresets,
             }).flatMap((item) =>
               // Above the destructive block, with the other ways to organize a thread.
-              item.id === "archive" ? [tagMenuItem([threadKey], "Tags"), item] : [item],
+              item.id === "archive"
+                ? [{ id: "tags" as const, label: "Tags…", icon: "tag" }, item]
+                : [item],
             ),
             position,
           ),
         );
         if (clicked._tag === "Failure" || clicked.value === null) return;
-        if (await applyTagMenuChoice([threadKey], clicked.value)) return;
+        if (clicked.value === "tags") {
+          openThreadTagPicker({ threadKeys: [threadKey], position });
+          return;
+        }
         const threadAction = clicked.value as ThreadActionMenuId;
         if (threadActionRequiresOperate(threadAction) && !checkThreadOperations([thread])) return;
         if (clicked.value?.startsWith("snooze:")) {
