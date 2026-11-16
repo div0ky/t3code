@@ -42,6 +42,10 @@ interface SidebarTagsStore {
   readonly setDraftTag: (draftId: string, name: string, tagged: boolean) => void;
   readonly applyDraftTags: (draftId: string, threadKeys: readonly string[]) => void;
   readonly clearDraftTags: (draftId: string) => void;
+  /** The thread key or draft id whose tag icon should pop once; cleared when the pop ends. */
+  readonly pulse: { readonly target: string; readonly seq: number } | null;
+  readonly pulseTag: (target: string) => void;
+  readonly settlePulse: (seq: number) => void;
 }
 
 type ServerConfigs = ReadonlyMap<
@@ -73,6 +77,27 @@ let chosenFilterKeys: readonly string[] = Array.isArray(storedFilter)
   ? storedFilter.filter((key) => typeof key === "string")
   : [];
 const mirror = createSidebarTagMirror();
+
+/** New chats' tags with `name` renamed, or dropped without `nextName`; untouched lists keep their identity. */
+function retagDrafts(
+  draftTags: SidebarTagsStore["draftTags"],
+  name: string,
+  nextName?: string,
+): SidebarTagsStore["draftTags"] {
+  const isNamed = (tag: string) => tagKey(tag) === tagKey(name);
+  return Object.fromEntries(
+    Object.entries(draftTags).map(([draftId, tags]) => {
+      if (!tags.some(isNamed)) return [draftId, tags];
+      const kept =
+        nextName === undefined
+          ? tags.filter((tag) => !isNamed(tag))
+          : tags
+              .filter((tag) => isNamed(tag) || tagKey(tag) !== tagKey(nextName))
+              .map((tag) => (isNamed(tag) ? nextName : tag));
+      return [draftId, kept];
+    }),
+  );
+}
 
 const sameNames = (a: readonly string[] | undefined, b: readonly string[]) =>
   a !== undefined && a.length === b.length && a.every((name, index) => name === b[index]);
@@ -314,6 +339,7 @@ export const useSidebarTagsStore = create<SidebarTagsStore>((set, get) => ({
         named.map((tag) => ({ action: "rename", tagId: tag.id, name: next })),
       );
     }
+    set((state) => ({ draftTags: retagDrafts(state.draftTags, name, next) }));
     if (chosenFilterKeys.includes(tagKey(name))) {
       setChosenFilterKeys([
         ...new Set(chosenFilterKeys.map((key) => (key === tagKey(name) ? tagKey(next) : key))),
@@ -329,6 +355,7 @@ export const useSidebarTagsStore = create<SidebarTagsStore>((set, get) => ({
         named.map((tag) => ({ action: "delete", tagId: tag.id })),
       );
     }
+    set((state) => ({ draftTags: retagDrafts(state.draftTags, name) }));
     setChosenFilterKeys(chosenFilterKeys.filter((key) => key !== tagKey(name)));
   },
   // ponytail: in memory, so a reload drops a draft's tags; persist with the draft if that grates.
@@ -348,6 +375,10 @@ export const useSidebarTagsStore = create<SidebarTagsStore>((set, get) => ({
   },
   clearDraftTags: (draftId) =>
     set(({ draftTags: { [draftId]: _dropped, ...draftTags } }) => ({ draftTags })),
+  pulse: null,
+  pulseTag: (target) => set((state) => ({ pulse: { target, seq: (state.pulse?.seq ?? 0) + 1 } })),
+  // Settling only its own pulse keeps a row that remounts later from replaying an old one.
+  settlePulse: (seq) => set((state) => (state.pulse?.seq === seq ? { pulse: null } : state)),
 }));
 
 if (typeof window !== "undefined") {

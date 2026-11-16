@@ -15,6 +15,17 @@ describe("detectComposerTrigger", () => {
     expect(detectComposerTrigger(text, cursor)).toBeNull();
   });
 
+  it("looks up pull requests after ## and leaves a single # alone", () => {
+    expect(detectComposerTrigger("see ##19", 8)).toEqual({
+      kind: "pull-request",
+      query: "19",
+      rangeStart: 4,
+      rangeEnd: 8,
+    });
+    expect(detectComposerTrigger("see #19", 7)).toBeNull();
+    expect(detectComposerTrigger("## Heading", 10)).toBeNull();
+  });
+
   it("keeps a slash in the line-leading model picker query", () => {
     expect(detectComposerTrigger("/model openai/gpt", 17)).toMatchObject({
       kind: "slash-model",

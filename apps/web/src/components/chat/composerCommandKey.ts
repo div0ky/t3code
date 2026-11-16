@@ -1,5 +1,6 @@
 import type { ChatComposerProps } from "./ChatComposer";
 import { type ComposerCommandItem } from "./ComposerCommandMenu";
+import { spaceTakesTag } from "./composerTagItems";
 import {
   type ComposerDispatchMode,
   resolveComposerDispatchMode,
@@ -239,6 +240,20 @@ export function composerCommandKeyHandler(input: {
       }
       if ((key === "Enter" || key === "Tab") && selectedItem) {
         onSelectComposerItem(selectedItem);
+        return true;
+      }
+      if (
+        key === " " &&
+        trigger?.kind === "tag" &&
+        selectedItem?.type === "tag" &&
+        spaceTakesTag(trigger.query, selectedItem.name) &&
+        !event.isComposing &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey
+      ) {
+        // Space means "this tag", so it never removes one the thread already has.
+        onSelectComposerItem({ ...selectedItem, tagged: false });
         return true;
       }
     }

@@ -21,6 +21,7 @@ import {
   MessagesSquareIcon,
   PackageIcon,
   SettingsIcon,
+  TagIcon,
   UserRoundIcon,
   type LucideIcon,
 } from "lucide-react";
@@ -73,6 +74,14 @@ export type ComposerCommandItem =
       id: string;
       type: "pull-request";
       pullRequest: PullRequestContextMetadata;
+      label: string;
+      description: string;
+    }
+  | {
+      id: string;
+      type: "tag";
+      name: string;
+      tagged: boolean;
       label: string;
       description: string;
     }
@@ -245,6 +254,15 @@ const ComposerCommandMenuItem = memo(function ComposerCommandMenuItem(props: {
           iconClassName="size-4"
         />
       ) : null}
+      {props.item.type === "tag" ? (
+        <TagIcon
+          aria-hidden="true"
+          className={cn(
+            "size-4 shrink-0 text-secondary-label",
+            props.isActive && "motion-safe:animate-tag-wiggle",
+          )}
+        />
+      ) : null}
       {pullRequestPresentation ? (
         <pullRequestPresentation.Icon
           role="img"
@@ -287,6 +305,7 @@ const LISTBOX_LABEL_BY_TRIGGER: Record<ComposerTriggerKind, string> = {
   "pull-request": "Pull requests",
   "slash-command": "Commands",
   skill: "Skills",
+  tag: "Tags",
 };
 
 const SKILL_SOURCE_ICON_BY_KIND: Record<ProviderSkillSourceKind, LucideIcon> = {

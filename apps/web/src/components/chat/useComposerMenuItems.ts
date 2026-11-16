@@ -38,6 +38,7 @@ import {
   type EnvironmentQueryTarget,
 } from "~/state/pullRequests";
 import { useEnvironmentQuery } from "~/state/query";
+import { useSidebarTagsStore } from "../../sidebarTagsStore";
 import { useComposerPathSearch, useDebouncedValue, useThreadSearch } from "~/state/queries";
 import {
   matchesPullRequestQuery,
@@ -45,6 +46,7 @@ import {
 } from "../pullRequest/pullRequestList.logic";
 import type { ComposerCommandItem } from "./ComposerCommandMenu";
 import { matchComposerModelItems } from "./composerModelMentions";
+import { matchComposerTagItems } from "./composerTagItems";
 import type { ModelEsque } from "./providerIconUtils";
 import type { ProviderInstanceEntry } from "../../providerInstances";
 import {
@@ -57,7 +59,7 @@ const COMPOSER_PULL_REQUEST_RESULT_LIMIT = 12;
 const EMPTY_PULL_REQUEST_LIST_TARGETS: ReadonlyArray<EnvironmentQueryTarget<PullRequestListInput>> =
   [];
 
-/** Builds the @, /, $ and # suggestion lists, running the searches each trigger needs. */
+/** Builds the @, /, $, # and ## suggestion lists, running the searches each trigger needs. */
 export function useComposerMenuItems({
   composerTrigger,
   environmentId,
@@ -67,6 +69,8 @@ export function useComposerMenuItems({
   pullRequestProjectId,
   pullRequestRepository,
   threadPullRequests,
+  tagThreadKey,
+  tagDraftId,
   sideChatAvailable,
   sideChatDisabledReason,
   freshSessionAvailable,
@@ -87,6 +91,9 @@ export function useComposerMenuItems({
   readonly pullRequestProjectId: ProjectId | null;
   readonly pullRequestRepository: string | null;
   readonly threadPullRequests: ReadonlyArray<ThreadPullRequestLink> | undefined;
+  /** What `#` tags: the thread once it exists, else the new chat's draft. */
+  readonly tagThreadKey: string | null;
+  readonly tagDraftId: string | null;
   readonly sideChatAvailable: boolean;
   readonly sideChatDisabledReason: string | null;
   readonly freshSessionAvailable: boolean;
@@ -187,6 +194,16 @@ export function useComposerMenuItems({
           },
         }),
   );
+
+  const storedTags = useSidebarTagsStore((store) => store.tags);
+  const appliedTags = useSidebarTagsStore((store) =>
+    tagThreadKey !== null
+      ? store.tagsByThreadKey[tagThreadKey]
+      : tagDraftId !== null
+        ? store.draftTags[tagDraftId]
+        : undefined,
+  );
+  const tagsAvailable = tagThreadKey !== null || tagDraftId !== null;
 
   const linkedPullRequests =
     pullRequestProjectId === null
@@ -320,6 +337,15 @@ export function useComposerMenuItems({
           (skill.scope ? `${skill.scope} skill` : "Run provider skill"),
       }));
     }
+    if (composerTrigger.kind === "tag") {
+      return tagsAvailable
+        ? matchComposerTagItems({
+            tags: storedTags,
+            applied: appliedTags ?? [],
+            query: composerTrigger.query,
+          })
+        : [];
+    }
     if (
       composerTrigger.kind === "pull-request" &&
       pullRequestProjectId !== null &&
@@ -411,6 +437,12 @@ export function useComposerMenuItems({
       return composerTrigger?.query
         ? `No pull request matches ${composerTrigger.query}.`
         : "No pull requests found in this repository.";
+    }
+    if (composerTriggerKind === "tag") {
+      if (!tagsAvailable) return "Tags are not available until this thread loads.";
+      return composerTrigger?.query
+        ? `No tag matches ${composerTrigger.query}. Type ## for pull requests.`
+        : "No tags yet. Create one from a thread's Tags menu. Type ## for pull requests.";
     }
     return composerTriggerKind === "path"
       ? "No matching files or folders."

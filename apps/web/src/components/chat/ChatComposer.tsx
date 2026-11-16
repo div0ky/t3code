@@ -160,6 +160,7 @@ import {
   composerContextRecordsFromDraft,
 } from "../composerContextPresentation";
 import { useOpenPrLink } from "~/lib/openPullRequestLink";
+import { useSidebarTagsStore } from "~/sidebarTagsStore";
 import {
   collectInlineContextIds,
   type ComposerContextReference,
@@ -344,6 +345,8 @@ export interface ChatComposerProps {
   maxFileAttachmentBytes: number | null;
   routeKind: "server" | "draft";
   routeThreadRef: ScopedThreadRef;
+  /** The thread exists on its server, so it is no longer only a draft. */
+  isServerThread: boolean;
   draftId: DraftId | null;
   multipleModelSelections: ReadonlyArray<ModelSelection> | null;
   supportsMultipleModels: boolean;
@@ -1082,6 +1085,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     composerPreviewAnnotations.length === 0 &&
     composerReviewComments.length === 0;
   const linkedEnvironments = useLinkedEnvironments(environmentId);
+  // A draft's tags are applied and dropped at its first send, so an existing thread is tagged itself.
+  const tagThreadKey = props.isServerThread ? scopedThreadKey(routeThreadRef) : null;
+  const tagDraftId = props.isServerThread ? null : draftId;
   const {
     items: composerMenuItems,
     isLoading: isComposerMenuLoading,
@@ -1095,6 +1101,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     pullRequestProjectId,
     pullRequestRepository,
     threadPullRequests,
+    tagThreadKey,
+    tagDraftId,
     sideChatAvailable: props.sideChatAvailable === true,
     sideChatDisabledReason: props.sideChatDisabledReason ?? null,
     freshSessionAvailable: props.onFreshSession !== undefined,
@@ -1963,6 +1971,25 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         });
         setComposerHighlightedItemId(null);
       }
+      return;
+    }
+    if (item.type === "tag") {
+      if (trigger.kind !== "tag") return;
+      const rangeEnd = extendReplacementRangeForTrailingSpace(
+        snapshot.value,
+        trigger.rangeEnd,
+        " ",
+      );
+      const applied = applyPromptReplacement(trigger.rangeStart, rangeEnd, "", {
+        expectedText: snapshot.value.slice(trigger.rangeStart, rangeEnd),
+      });
+      if (!applied) return;
+      setComposerHighlightedItemId(null);
+      const tags = useSidebarTagsStore.getState();
+      if (tagThreadKey !== null) tags.setThreadsTag([tagThreadKey], item.name, !item.tagged);
+      else if (tagDraftId !== null) tags.setDraftTag(tagDraftId, item.name, !item.tagged);
+      const pulseTarget = tagThreadKey ?? tagDraftId;
+      if (pulseTarget !== null) tags.pulseTag(pulseTarget);
       return;
     }
     if (item.type === "thread") {

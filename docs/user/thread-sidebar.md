@@ -151,6 +151,12 @@ them have shows a dash. A thread's card shows its tags.
 To tag a thread before it exists, use **Tags** under the composer on a new thread. The tags go on
 when you send the first message; with several models selected, every thread it starts gets them.
 
+You can also tag from the composer: type `#` and part of a tag's name, then choose it. Pressing Space
+takes the highlighted tag when its name starts with what you typed, so you can keep writing. The tag goes
+on the thread, or on the new thread you are writing, and the `#name` text is removed so the agent
+never sees it. Choosing a tag the thread already has removes it. This finds existing tags only;
+create new ones from **Tags**.
+
 Use the tag button next to the search box to choose which tags to show. Pick one or more and the
 sidebar lists only threads with any of them, in every section, and search looks only within
 them. The button shows a dot while a filter is on; choose **Show all threads** to clear it. The thread you have open stays listed even

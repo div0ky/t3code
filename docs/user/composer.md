@@ -22,7 +22,7 @@ plain Markdown with no styling, turn off **Settings → Chat → Rich text
 composer**. Lines starting with `- `, `1. `, `- [ ] `, `> `, `# ` or `---`
 become lists, task lists, quotes, headings and rules; ` ``` ` followed by Enter
 opens a code block. What you typed is what the agent receives, markers and
-numbering included, and `#1234` without a space still looks up a pull request.
+numbering included. `#name` without a space still finds a tag, and `##1234` a pull request.
 
 Some styled text containing or touching literal Markdown characters, such as a
 bold `path\` or `2*3`, keeps its styling without showing markers. Use formatting
@@ -331,11 +331,11 @@ excerpt, Terminal 1 lines 3-4" and similar to screen readers.
 
 A pull request appears as its icon and number. Its color reflects whether it was open, draft,
 merged, or closed when it was attached. Select it to inspect the captured title and branches,
-then choose **Open pull request** to visit the pull request. On web and desktop, type `#` to browse the newest
+then choose **Open pull request** to visit the pull request. On web and desktop, type `##` to browse the newest
 pull requests in the current project's repository. Pull requests linked to the thread are included
 from any repository and listed first, after any exact number match. Continue typing digits to filter the recent list
 by any part of its pull request numbers. A complete number is also resolved directly, even when that
-pull request is older than the recent list. Type a single word after `#` to search pull requests in
+pull request is older than the recent list. Type a single word after `##` to search pull requests in
 the repository by text. Choose a result to insert it as a chip.
 
 Another thread can be context too. Type `@` followed by part of its title to pick one from
