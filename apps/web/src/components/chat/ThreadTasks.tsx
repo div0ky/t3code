@@ -1,5 +1,10 @@
 import type { OrchestrationV2PlanStep } from "@t3tools/contracts";
-import { CircleCheckIcon, CircleDashedIcon, CircleEllipsisIcon } from "lucide-react";
+import {
+  ChevronDownIcon,
+  CircleCheckIcon,
+  CircleDashedIcon,
+  CircleEllipsisIcon,
+} from "lucide-react";
 
 import { cn } from "~/lib/utils";
 import { windowTaskSteps } from "../ChatView.logic";
@@ -54,12 +59,16 @@ export function ThreadTasks({
   steps,
   live,
   runningTaskCount,
+  collapsed,
+  onToggleCollapsed,
 }: {
   readonly steps: ReadonlyArray<OrchestrationV2PlanStep>;
   /** The run that wrote the list is still working. */
   readonly live: boolean;
   /** Work the agent left running after its turn, shown under the current step. */
   readonly runningTaskCount: number;
+  readonly collapsed: boolean;
+  readonly onToggleCollapsed: () => void;
 }) {
   const { visible, hiddenBefore, hiddenAfter } = windowTaskSteps(steps, MAX_VISIBLE_STEPS);
   const done = steps.filter((step) => step.status === "completed").length;
@@ -68,39 +77,63 @@ export function ThreadTasks({
     steps.find((step) => step.status === "pending");
   return (
     <div className="chat-content-lane px-1 pb-3">
-      <ul
-        aria-label={`Tasks: ${done} of ${steps.length} done`}
+      <div
         data-thread-tasks="true"
-        className="flex flex-col gap-2 rounded-2xl border border-border/80 bg-card p-4 text-sm transition-opacity duration-150 ease-out starting:opacity-0 motion-reduce:transition-none"
+        className="rounded-2xl border border-border/80 bg-card text-sm transition-opacity duration-150 ease-out starting:opacity-0 motion-reduce:transition-none"
       >
-        <HiddenSteps
-          count={hiddenBefore}
-          label={hiddenBefore === 1 ? "earlier step" : "earlier steps"}
-        />
-        {visible.map((step, index) => (
-          // Providers do not promise unique step ids, and a list only ever grows or re-statuses.
-          <li key={`${hiddenBefore + index}:${step.id}`} className="flex items-start gap-2.5">
-            <StepIcon status={step.status} live={live} />
-            <div className="min-w-0 flex-1">
-              <p
-                className={cn(
-                  "wrap-anywhere",
-                  step.status === "completed" ? "text-muted-foreground" : "text-foreground",
-                )}
-              >
-                <span className="sr-only">{statusLabels[step.status]}: </span>
-                {step.text}
-              </p>
-              {step === current && runningTaskCount > 0 ? (
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {runningTaskCount} running {runningTaskCount === 1 ? "task" : "tasks"}
-                </p>
-              ) : null}
-            </div>
-          </li>
-        ))}
-        <HiddenSteps count={hiddenAfter} label="more to go" />
-      </ul>
+        <button
+          type="button"
+          aria-expanded={!collapsed}
+          onClick={onToggleCollapsed}
+          className="flex w-full cursor-pointer items-center gap-2 rounded-2xl px-4 py-2.5 text-left text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70"
+        >
+          <span className="shrink-0 font-medium">
+            Tasks {done}/{steps.length}
+          </span>
+          <span className="min-w-0 flex-1 truncate">
+            {collapsed && current !== undefined ? current.text : null}
+          </span>
+          <span className="sr-only">{collapsed ? "Show tasks" : "Hide tasks"}</span>
+          <ChevronDownIcon
+            aria-hidden
+            className={cn("size-3.5 shrink-0 transition-transform", collapsed && "-rotate-90")}
+          />
+        </button>
+        {collapsed ? null : (
+          <ul
+            aria-label={`Tasks: ${done} of ${steps.length} done`}
+            className="flex flex-col gap-2 px-4 pb-4"
+          >
+            <HiddenSteps
+              count={hiddenBefore}
+              label={hiddenBefore === 1 ? "earlier step" : "earlier steps"}
+            />
+            {visible.map((step, index) => (
+              // Providers do not promise unique step ids, and a list only ever grows or re-statuses.
+              <li key={`${hiddenBefore + index}:${step.id}`} className="flex items-start gap-2.5">
+                <StepIcon status={step.status} live={live} />
+                <div className="min-w-0 flex-1">
+                  <p
+                    className={cn(
+                      "wrap-anywhere",
+                      step.status === "completed" ? "text-muted-foreground" : "text-foreground",
+                    )}
+                  >
+                    <span className="sr-only">{statusLabels[step.status]}: </span>
+                    {step.text}
+                  </p>
+                  {step === current && runningTaskCount > 0 ? (
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {runningTaskCount} running {runningTaskCount === 1 ? "task" : "tasks"}
+                    </p>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+            <HiddenSteps count={hiddenAfter} label="more to go" />
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

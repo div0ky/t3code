@@ -148,6 +148,9 @@ create it on the thread. A thread can have several tags, and tagging never moves
 place, pin, and section. Select several threads first to tag them all at once; a tag only some of
 them have shows a dash. A thread's card shows its tags.
 
+To tag a thread before it exists, use **Tags** under the composer on a new thread. The tags go on
+when you send the first message; with several models selected, every thread it starts gets them.
+
 Use the tag button next to the search box to choose which tags to show. Pick one or more and the
 sidebar lists only threads with any of them, in every section, and search looks only within
 them. The button shows a dot while a filter is on; choose **Show all threads** to clear it. The thread you have open stays listed even

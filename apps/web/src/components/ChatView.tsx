@@ -358,6 +358,7 @@ import { useDraftEnvironmentRouting } from "./chat/useDraftEnvironmentRouting";
 import { branchMismatchBannerItem, extensionStatusBannerItem } from "./chat/ThreadActivityBanners";
 import { ThreadNow } from "./chat/ThreadNow";
 import { ThreadTasks } from "./chat/ThreadTasks";
+import { ComposerContextTags } from "./ComposerContextTags";
 import type { ThreadStructure } from "@t3tools/client-runtime/state/shell";
 import { useDelayedStatus } from "../hooks/useDelayedStatus";
 import { useTimelineFollow } from "./chat/useTimelineFollow";
@@ -1443,6 +1444,10 @@ export default function ChatView(props: ChatViewProps) {
     activeProviderThread,
   );
   const pendingBackgroundTasks = deriveThreadPendingBackgroundTasks(serverProjection);
+  // ponytail: in-memory, so a reload reopens the list; move to uiStateStore if that grates.
+  const [collapsedTaskThreadKeys, setCollapsedTaskThreadKeys] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
   const threadTasks = deriveThreadTasks(
     serverProjection,
     activeActivityRun?.runId ?? null,
@@ -3106,6 +3111,14 @@ export default function ChatView(props: ChatViewProps) {
           <ThreadTasks
             steps={threadTasks.steps}
             live={threadTasks.live}
+            collapsed={collapsedTaskThreadKeys.has(routeThreadKey)}
+            onToggleCollapsed={() =>
+              setCollapsedTaskThreadKeys((keys) => {
+                const next = new Set(keys);
+                if (!next.delete(routeThreadKey)) next.add(routeThreadKey);
+                return next;
+              })
+            }
             // Monitors, which include PR watches, wait on something; they are not running work.
             runningTaskCount={
               pendingBackgroundTasks.filter((task) => task.kind !== "monitor").length
@@ -3781,14 +3794,19 @@ export default function ChatView(props: ChatViewProps) {
                                     ? {}
                                     : {
                                         trailing: (
-                                          <ComposerContextPermissions
-                                            environmentId={environmentId}
-                                            runtimeMode={runtimeMode}
-                                            supportedRuntimeModes={
-                                              activeProviderStatus?.supportedRuntimeModes
-                                            }
-                                            onRuntimeModeChange={handleRuntimeModeChangeStable}
-                                          />
+                                          <div className="ms-auto flex min-w-0 items-center gap-1">
+                                            {routeKind === "draft" && draftId ? (
+                                              <ComposerContextTags draftId={draftId} />
+                                            ) : null}
+                                            <ComposerContextPermissions
+                                              environmentId={environmentId}
+                                              runtimeMode={runtimeMode}
+                                              supportedRuntimeModes={
+                                                activeProviderStatus?.supportedRuntimeModes
+                                              }
+                                              onRuntimeModeChange={handleRuntimeModeChangeStable}
+                                            />
+                                          </div>
                                         ),
                                       })}
                                 />

@@ -37,6 +37,11 @@ interface SidebarTagsStore {
   readonly createTag: (name: string, environmentId: EnvironmentId | null) => void;
   readonly renameTag: (name: string, nextName: string) => void;
   readonly deleteTag: (name: string) => void;
+  /** Tags chosen on a new chat, held by draft id until its first send creates the thread. */
+  readonly draftTags: Readonly<Record<string, readonly string[]>>;
+  readonly setDraftTag: (draftId: string, name: string, tagged: boolean) => void;
+  readonly applyDraftTags: (draftId: string, threadKeys: readonly string[]) => void;
+  readonly clearDraftTags: (draftId: string) => void;
 }
 
 type ServerConfigs = ReadonlyMap<
@@ -245,7 +250,7 @@ async function importLegacyFolders(configs: ServerConfigs) {
   }
 }
 
-export const useSidebarTagsStore = create<SidebarTagsStore>((_set, get) => ({
+export const useSidebarTagsStore = create<SidebarTagsStore>((set, get) => ({
   tags: [],
   tagsByThreadKey: {},
   filter: [],
@@ -326,6 +331,23 @@ export const useSidebarTagsStore = create<SidebarTagsStore>((_set, get) => ({
     }
     setChosenFilterKeys(chosenFilterKeys.filter((key) => key !== tagKey(name)));
   },
+  // ponytail: in memory, so a reload drops a draft's tags; persist with the draft if that grates.
+  draftTags: {},
+  setDraftTag: (draftId, name, tagged) => {
+    const trimmed = name.trim();
+    if (trimmed.length === 0) return;
+    const rest = (get().draftTags[draftId] ?? []).filter(
+      (existing) => tagKey(existing) !== tagKey(trimmed),
+    );
+    set((state) => ({
+      draftTags: { ...state.draftTags, [draftId]: tagged ? [...rest, trimmed] : rest },
+    }));
+  },
+  applyDraftTags: (draftId, threadKeys) => {
+    for (const name of get().draftTags[draftId] ?? []) get().setThreadsTag(threadKeys, name, true);
+  },
+  clearDraftTags: (draftId) =>
+    set(({ draftTags: { [draftId]: _dropped, ...draftTags } }) => ({ draftTags })),
 }));
 
 if (typeof window !== "undefined") {
