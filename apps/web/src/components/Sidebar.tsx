@@ -3817,7 +3817,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 </>
               ) : tagFilter.length > 0 ? (
                 <>
-                  <span>No threads tagged {describeTagFilter(tagFilter, tagFilterMode)}</span>
+                  <span>No threads {describeTagFilter(tagFilter, tagFilterMode)}</span>
                   <button
                     type="button"
                     onClick={clearTagFilter}

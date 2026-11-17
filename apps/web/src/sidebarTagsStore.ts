@@ -24,22 +24,22 @@ const LEGACY_STORAGE_KEY = "t3code:sidebar-folders:v1";
 const FILTER_STORAGE_KEY = "t3code:sidebar-tag-filter:v1";
 const FILTER_MODE_STORAGE_KEY = "t3code:sidebar-tag-filter-mode:v1";
 
-/** Whether a thread needs any one of the filter's tags, or all of them. */
-export type TagFilterMode = "any" | "all";
+/** Whether a thread needs any one of the filter's tags, all of them, or none of them. */
+export type TagFilterMode = "any" | "all" | "none";
 
 export function matchesTagFilter(
   threadTags: readonly string[] | undefined,
   filter: readonly string[],
   mode: TagFilterMode,
 ): boolean {
-  if (threadTags === undefined) return false;
-  const tagged = (tag: string) => threadTags.includes(tag);
+  const tagged = (tag: string) => threadTags?.includes(tag) ?? false;
+  if (mode === "none") return !filter.some(tagged);
   return mode === "all" ? filter.every(tagged) : filter.some(tagged);
 }
 
-/** The filter as a phrase: "Active or Mobile", "Active and Mobile". */
+/** The filter as a phrase: "tagged Active or Mobile", "tagged Active and Mobile", "without Active or Mobile". */
 export const describeTagFilter = (filter: readonly string[], mode: TagFilterMode) =>
-  filter.join(mode === "all" ? " and " : " or ");
+  `${mode === "none" ? "without" : "tagged"} ${filter.join(mode === "all" ? " and " : " or ")}`;
 
 interface SidebarTagsStore {
   /** Tag names, one per name however many environments hold it. */
@@ -96,8 +96,12 @@ const storedFilter = typeof window === "undefined" ? null : readJson(FILTER_STOR
 let chosenFilterKeys: readonly string[] = Array.isArray(storedFilter)
   ? storedFilter.filter((key) => typeof key === "string")
   : [];
+const storedFilterModeValue =
+  typeof window === "undefined" ? null : readJson(FILTER_MODE_STORAGE_KEY);
 const storedFilterMode: TagFilterMode =
-  typeof window !== "undefined" && readJson(FILTER_MODE_STORAGE_KEY) === "all" ? "all" : "any";
+  storedFilterModeValue === "all" || storedFilterModeValue === "none"
+    ? storedFilterModeValue
+    : "any";
 const mirror = createSidebarTagMirror();
 
 /** New chats' tags with `name` renamed, or dropped without `nextName`; untouched lists keep their identity. */
@@ -312,7 +316,7 @@ export const useSidebarTagsStore = create<SidebarTagsStore>((set, get) => ({
   clearFilter: () => setChosenFilterKeys([]),
   filterMode: storedFilterMode,
   setFilterMode: (filterMode) => {
-    writeLocal(FILTER_MODE_STORAGE_KEY, filterMode === "all" ? filterMode : null);
+    writeLocal(FILTER_MODE_STORAGE_KEY, filterMode === "any" ? null : filterMode);
     set({ filterMode });
   },
   setThreadsTag: (threadKeys, name, tagged) => {

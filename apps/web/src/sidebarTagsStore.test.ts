@@ -207,7 +207,7 @@ describe("useSidebarTagsStore", () => {
     expect(storage.has(FILTER_KEY)).toBe(false);
   });
 
-  it("matches a thread on any chosen tag, or on all of them, and remembers which", async () => {
+  it("matches a thread on any chosen tag, all of them, or none of them, and remembers which", async () => {
     const { store, storage } = await setup();
     const { matchesTagFilter } = await import("./sidebarTagsStore");
     const filter = ["Active", "Mobile"];
@@ -215,15 +215,18 @@ describe("useSidebarTagsStore", () => {
     expect(matchesTagFilter(["Mobile", "Other"], filter, "all")).toBe(false);
     expect(matchesTagFilter(["Active", "Mobile", "Other"], filter, "all")).toBe(true);
     expect(matchesTagFilter(undefined, filter, "any")).toBe(false);
+    expect(matchesTagFilter(["Mobile", "Other"], filter, "none")).toBe(false);
+    expect(matchesTagFilter(["Other"], filter, "none")).toBe(true);
+    expect(matchesTagFilter(undefined, filter, "none")).toBe(true);
 
     expect(store.getState().filterMode).toBe("any");
     store.getState().setFilterMode("all");
     expect(JSON.parse(storage.get(FILTER_MODE_KEY)!)).toBe("all");
     const reloaded = await setup();
-    reloaded.storage.set(FILTER_MODE_KEY, JSON.stringify("all"));
+    reloaded.storage.set(FILTER_MODE_KEY, JSON.stringify("none"));
     vi.resetModules();
     expect((await import("./sidebarTagsStore")).useSidebarTagsStore.getState().filterMode).toBe(
-      "all",
+      "none",
     );
   });
 
