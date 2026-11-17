@@ -38,7 +38,7 @@ export function SidebarTagFilter(props: {
           <SidebarHeaderIconButton
             label={
               filter.length > 0
-                ? `Filter threads by tag: ${describeTagFilter(filter, filterMode)}`
+                ? `Showing threads ${describeTagFilter(filter, filterMode)}`
                 : "Filter threads by tag"
             }
           />
@@ -58,7 +58,11 @@ export function SidebarTagFilter(props: {
       <MenuPopup align="start" className="w-[min(16rem,var(--available-width))]">
         <MenuGroup>
           <MenuGroupLabel>
-            {tags.length === 0 ? "No tags yet" : "Show threads tagged"}
+            {tags.length === 0
+              ? "No tags yet"
+              : filterMode === "none"
+                ? "Hide threads tagged"
+                : "Show threads tagged"}
           </MenuGroupLabel>
           {tags.map((name) => (
             <MenuCheckboxItem
@@ -74,7 +78,7 @@ export function SidebarTagFilter(props: {
             </MenuCheckboxItem>
           ))}
         </MenuGroup>
-        {tags.length > 1 ? (
+        {tags.length > 0 ? (
           <>
             <MenuSeparator />
             <MenuGroup>
@@ -86,10 +90,16 @@ export function SidebarTagFilter(props: {
                   props.onFilterChange();
                 }}
               >
-                {(["any", "all"] as const).map((mode) => (
+                {(
+                  [
+                    ["any", "Any tag (OR)"],
+                    ["all", "All tags (AND)"],
+                    ["none", "None of them (NOT)"],
+                  ] as const
+                ).map(([mode, label]) => (
                   <MenuRadioItem key={mode} value={mode} closeOnClick={false}>
                     <span className="flex items-center justify-between gap-2">
-                      {mode === "any" ? "Any tag (OR)" : "All tags (AND)"}
+                      {label}
                       <MenuRadioItemIndicator />
                     </span>
                   </MenuRadioItem>

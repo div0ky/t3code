@@ -160,8 +160,8 @@ create new ones from **Tags**.
 Use the tag button next to the search box to choose which tags to show. Pick one or more and the
 sidebar lists only threads with any of them, in every section, and search looks only within
 them. Under **Match**, switch from **Any tag (OR)** to **All tags (AND)** to list only threads that have
-every tag you picked. The button shows a dot while a filter is on; choose **Show all threads** to clear it. The thread you have open stays listed even
-when it has none of the chosen tags, so a new thread does not vanish before you tag it. While a
+every tag you picked, or to **None of them (NOT)** to hide threads with any of them. The button shows a dot while a filter is on; choose **Show all threads** to clear it. The thread you have open stays listed even
+when the filter would hide it, so a new thread does not vanish before you tag it. While a
 tag filter is on, the Settled section lists only the settled threads this device already holds,
 not older ones it would load on request.
 
