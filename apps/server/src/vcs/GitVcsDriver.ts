@@ -1010,11 +1010,14 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
   // Set fsync first: Git 2.36 ignores unknown batch without resetting the method.
   // Batch fully flushes refs and equals fsync on macOS HFS+/APFS and Windows NTFS/ReFS.
   // Keep per-object fsync elsewhere; VcsProcess retries unsupported macOS full flushes with plain fsync.
-  const durableWrite = [
+  const objectFsync = [
     "-c",
     "core.fsync=objects,reference",
     "-c",
     "core.fsyncMethod=fsync",
+  ] as const;
+  const durableWrite = [
+    ...objectFsync,
     ...(hostPlatform === "darwin" || hostPlatform === "win32"
       ? ["-c", "core.fsyncMethod=batch"]
       : []),
@@ -1414,7 +1417,8 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
             cwd: input.cwd,
             args: [
               ...indexConfig,
-              ...durableWrite,
+              // Batch fsync redirects large packs through another temporary object store.
+              ...objectFsync,
               ...longPaths,
               // safecrlf=true refuses LF files under CRLF conversion; capture them as Git's default does.
               "-c",
