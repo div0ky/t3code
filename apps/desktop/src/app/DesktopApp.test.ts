@@ -141,7 +141,7 @@ const runStubbedDesktop = (stub: StubbedDesktop) =>
           state: Effect.die("unused"),
           confirmAndImport: Effect.die("unused"),
           confirmAndQueueFullImport: Effect.die("unused"),
-          beforeBackendStart: Effect.void,
+          beforeBackendStart: stub.record("import"),
         }),
         Effect.provideService(DesktopClerk.DesktopClerk, {
           configure: Effect.void,
@@ -310,12 +310,6 @@ it.effect.each([false, true])(
       yield* Deferred.await(registrationStarted);
       yield* Deferred.await(windowStarted);
       yield* Deferred.await(tokenRequested);
-      // The backend spawns before menus, and its token is minted without waiting for the renderer.
-      assert.deepEqual(
-        events.filter((event) => event !== "token"),
-        ["identity", "ready", "identity", "backend", "menu", "window"],
-      );
-      assert.isAbove(events.indexOf("token"), events.indexOf("backend"));
       assert.isFalse(yield* Deferred.isDone(registrationStopped));
       const shutdown = yield* DesktopShutdown.DesktopShutdown;
       yield* shutdown.request;
@@ -328,6 +322,12 @@ it.effect.each([false, true])(
       assert.isFalse(yield* shutdown.isComplete);
       yield* Deferred.succeed(releaseHistory, undefined);
       const result = yield* Fiber.await(app);
+      // The backend spawns before menus, and its token is minted without waiting for the renderer.
+      assert.deepEqual(
+        events.filter((event) => event !== "token"),
+        ["identity", "ready", "identity", "import", "backend", "menu", "window"],
+      );
+      assert.isAbove(events.indexOf("token"), events.indexOf("backend"));
       assert.equal(Exit.isFailure(result), stopDefect);
       assert.isTrue(yield* shutdown.isComplete);
       assert.isTrue(yield* Deferred.isDone(registrationStopped));

@@ -78,6 +78,14 @@ it.layer(NodeServices.layer)("androidSdk", (it) => {
       const sdk = path.join(home, "sdk");
       yield* fs.makeDirectory(path.join(sdk, "platform-tools"), { recursive: true });
 
+      yield* fs.makeDirectory(path.join(home, "stale", "platform-tools"), { recursive: true });
+      const adb = path.join(
+        sdk,
+        "platform-tools",
+        (yield* HostProcess.Platform) === "win32" ? "adb.exe" : "adb",
+      );
+      yield* fs.writeFileString(adb, "");
+      yield* fs.chmod(adb, 0o755);
       const resolved = yield* androidSdk.pipe(
         Effect.provideService(HostProcess.Environment, {
           HOME: home,

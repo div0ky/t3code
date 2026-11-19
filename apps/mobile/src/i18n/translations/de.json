@@ -13,8 +13,6 @@
   "7953122755efa56e": "Deltas werden aufgelöst",
   "d9a8c7734f54ea3f": "Dateien werden ausgecheckt",
   "215fbed6f97db37d": "Stockt",
-  "b5899546709c27ef": "{organization} verwaltet die Updates von T3 Code.",
-  "4160b5f3b4d6ccb0": "{organization} verwaltet die Updates von T3 Code. Nur stabile Versionen können installiert werden.",
   "6365146db77a8dac": "{organization} beschränkt Threads auf „Beaufsichtigt“.",
   "2aa1c01bf8014725": "{organization} beschränkt Threads auf „Änderungen automatisch annehmen“.",
   "89563a8fff8bb751": "{organization} beschränkt Threads auf „Auto“.",
@@ -30,7 +28,6 @@
   "a78eb961f5618e7f": "Auf diesem Rechner nicht installiert.",
   "4c34e647dc74b279": "Benötigt Zugriff auf den Schlüsselbund, um die Cookies zu lesen.",
   "a613ba1b6f32fc2c": "Kein Verschlüsselungsschlüssel in deinem Schlüsselbund. Melde dich einmal in diesem Browser an und versuche es dann erneut.",
-  "322d9662c37ead48": "Gib T3 Code in Systemeinstellungen → Datenschutz & Sicherheit den Festplattenvollzugriff und versuche es dann erneut.",
   "24fdd54c2321912a": "Beende zuerst den Browser, damit seine Cookie-Datenbank gelesen werden kann.",
   "1e3857bfd41528f6": "Der Import aus diesem Browser ist auf dieser Plattform nicht möglich.",
   "2bfa3f72b8bb8657": "Auf den System-Schlüsselbund konnte nicht zugegriffen werden. Stelle sicher, dass der Schlüsselbund deines Desktops läuft und entsperrt ist, und versuche es dann erneut.",
@@ -5213,5 +5210,8 @@
   "fc67e3ef7fa8e70e": "Globales Anheften fehlgeschlagen",
   "9822903f8c06cdb3": "Aktualisiere den Server dieser Umgebung, um global anzuheften.",
   "5a1fa6be27e76393": "Dringlichkeitsmarkierung konnte nicht aktualisiert werden",
-  "951d270f25257ba6": "Die Dringlichkeitsmarkierung konnte nicht geändert werden."
+  "951d270f25257ba6": "Die Dringlichkeitsmarkierung konnte nicht geändert werden.",
+  "e5302d49cb51dfc0": "{organization} verwaltet die Updates von D5 Code.",
+  "332a0b7fcace64fc": "{organization} verwaltet die Updates von D5 Code. Nur stabile Versionen können installiert werden.",
+  "20f78cb23fce294a": "Gib D5 Code in Systemeinstellungen → Datenschutz & Sicherheit den Festplattenvollzugriff und versuche es dann erneut."
 }

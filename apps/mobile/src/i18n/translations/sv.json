@@ -13,8 +13,6 @@
   "7953122755efa56e": "Löser deltan",
   "d9a8c7734f54ea3f": "Checkar ut filer",
   "215fbed6f97db37d": "Har stannat",
-  "b5899546709c27ef": "{organization} hanterar uppdateringar av T3 Code.",
-  "4160b5f3b4d6ccb0": "{organization} hanterar uppdateringar av T3 Code. Bara stabila versioner kan installeras.",
   "6365146db77a8dac": "{organization} begränsar trådar till Övervakat.",
   "2aa1c01bf8014725": "{organization} begränsar trådar till Godkänn ändringar automatiskt.",
   "89563a8fff8bb751": "{organization} begränsar trådar till Auto.",
@@ -30,7 +28,6 @@
   "a78eb961f5618e7f": "Inte installerad på den här datorn.",
   "4c34e647dc74b279": "Behöver åtkomst till nyckelringen för att läsa sina cookies.",
   "a613ba1b6f32fc2c": "Ingen krypteringsnyckel i nyckelringen. Logga in i webbläsaren en gång och försök sedan igen.",
-  "322d9662c37ead48": "Ge T3 Code Full skivåtkomst i Systeminställningar → Integritet och säkerhet och försök sedan igen.",
   "24fdd54c2321912a": "Avsluta webbläsaren först så att dess cookie-databas kan läsas.",
   "1e3857bfd41528f6": "Import från den här webbläsaren går inte på den här plattformen.",
   "2bfa3f72b8bb8657": "Systemets nyckelring kunde inte nås. Kontrollera att skrivbordets nyckelring körs och är upplåst och försök sedan igen.",
@@ -5213,5 +5210,8 @@
   "fc67e3ef7fa8e70e": "Kunde inte fästa globalt",
   "9822903f8c06cdb3": "Uppdatera miljöns server för att fästa globalt.",
   "5a1fa6be27e76393": "Kunde inte uppdatera brådskandemarkeringen",
-  "951d270f25257ba6": "Brådskandemarkeringen kunde inte ändras."
+  "951d270f25257ba6": "Brådskandemarkeringen kunde inte ändras.",
+  "e5302d49cb51dfc0": "{organization} hanterar uppdateringar av D5 Code.",
+  "332a0b7fcace64fc": "{organization} hanterar uppdateringar av D5 Code. Bara stabila versioner kan installeras.",
+  "20f78cb23fce294a": "Ge D5 Code Full skivåtkomst i Systeminställningar → Integritet och säkerhet och försök sedan igen."
 }

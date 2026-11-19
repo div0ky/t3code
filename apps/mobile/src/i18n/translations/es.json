@@ -13,8 +13,6 @@
   "7953122755efa56e": "Resolviendo deltas",
   "d9a8c7734f54ea3f": "Haciendo checkout de archivos",
   "215fbed6f97db37d": "Detenido",
-  "b5899546709c27ef": "{organization} gestiona las actualizaciones de T3 Code.",
-  "4160b5f3b4d6ccb0": "{organization} gestiona las actualizaciones de T3 Code. Solo se pueden instalar versiones estables.",
   "6365146db77a8dac": "{organization} limita los hilos a Supervisado.",
   "2aa1c01bf8014725": "{organization} limita los hilos a Aceptar ediciones automáticamente.",
   "89563a8fff8bb751": "{organization} limita los hilos a Automático.",
@@ -30,7 +28,6 @@
   "a78eb961f5618e7f": "No está instalado en esta máquina.",
   "4c34e647dc74b279": "Necesita acceso al Llavero para leer sus cookies.",
   "a613ba1b6f32fc2c": "No hay clave de cifrado en tu Llavero. Inicia sesión una vez en ese navegador y vuelve a intentarlo.",
-  "322d9662c37ead48": "Concede a T3 Code acceso total al disco en Ajustes del Sistema → Privacidad y seguridad y vuelve a intentarlo.",
   "24fdd54c2321912a": "Cierra primero el navegador para poder leer su base de datos de cookies.",
   "1e3857bfd41528f6": "No se puede importar desde este navegador en esta plataforma.",
   "2bfa3f72b8bb8657": "No se pudo acceder al llavero del sistema. Asegúrate de que el llavero de tu escritorio está en ejecución y desbloqueado y vuelve a intentarlo.",
@@ -5207,5 +5204,8 @@
   "fc67e3ef7fa8e70e": "No se pudo fijar globalmente",
   "9822903f8c06cdb3": "Actualiza el servidor de este entorno para fijar globalmente.",
   "5a1fa6be27e76393": "No se pudo actualizar la marca de urgente",
-  "951d270f25257ba6": "No se pudo cambiar la marca de urgente."
+  "951d270f25257ba6": "No se pudo cambiar la marca de urgente.",
+  "e5302d49cb51dfc0": "{organization} gestiona las actualizaciones de D5 Code.",
+  "332a0b7fcace64fc": "{organization} gestiona las actualizaciones de D5 Code. Solo se pueden instalar versiones estables.",
+  "20f78cb23fce294a": "Concede a D5 Code acceso total al disco en Ajustes del Sistema → Privacidad y seguridad y vuelve a intentarlo."
 }

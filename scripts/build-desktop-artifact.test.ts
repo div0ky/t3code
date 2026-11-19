@@ -584,7 +584,8 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
 
       assert.notInclude(stable, "${version}");
       assert.notInclude(nightly, "${version}");
-      assert.notEqual(stable, nightly);
+      assert.equal(stable, "D5-Code-${arch}.${ext}");
+      assert.equal(nightly, "D5-Code-Nightly-${arch}.${ext}");
     }).pipe(
       Effect.provide(
         ConfigProvider.layer(

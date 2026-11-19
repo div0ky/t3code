@@ -13,8 +13,6 @@
   "7953122755efa56e": "Resolvendo deltas",
   "d9a8c7734f54ea3f": "Fazendo checkout dos arquivos",
   "215fbed6f97db37d": "Travado",
-  "b5899546709c27ef": "{organization} gerencia as atualizações do T3 Code.",
-  "4160b5f3b4d6ccb0": "{organization} gerencia as atualizações do T3 Code. Só é possível instalar versões estáveis.",
   "6365146db77a8dac": "{organization} limita as threads a Supervisionado.",
   "2aa1c01bf8014725": "{organization} limita as threads a Aceitar edições automaticamente.",
   "89563a8fff8bb751": "{organization} limita as threads a Auto.",
@@ -30,7 +28,6 @@
   "a78eb961f5618e7f": "Não instalado nesta máquina.",
   "4c34e647dc74b279": "Precisa de acesso ao Keychain para ler os cookies.",
   "a613ba1b6f32fc2c": "Não há chave de criptografia no seu Keychain. Entre nesse navegador uma vez e tente novamente.",
-  "322d9662c37ead48": "Dê ao T3 Code Acesso Total ao Disco em Ajustes do Sistema → Privacidade e Segurança e tente novamente.",
   "24fdd54c2321912a": "Feche o navegador primeiro para que o banco de dados de cookies possa ser lido.",
   "1e3857bfd41528f6": "Não é possível importar deste navegador nesta plataforma.",
   "2bfa3f72b8bb8657": "Não foi possível acessar o keyring do sistema. Verifique se o keyring da área de trabalho está em execução e desbloqueado e tente novamente.",
@@ -5207,5 +5204,8 @@
   "fc67e3ef7fa8e70e": "Não foi possível fixar globalmente",
   "9822903f8c06cdb3": "Atualize o servidor deste ambiente para fixar globalmente.",
   "5a1fa6be27e76393": "Não foi possível atualizar a marca de urgente",
-  "951d270f25257ba6": "Não foi possível alterar a marca de urgente."
+  "951d270f25257ba6": "Não foi possível alterar a marca de urgente.",
+  "e5302d49cb51dfc0": "{organization} gerencia as atualizações do D5 Code.",
+  "332a0b7fcace64fc": "{organization} gerencia as atualizações do D5 Code. Só é possível instalar versões estáveis.",
+  "20f78cb23fce294a": "Dê ao D5 Code Acesso Total ao Disco em Ajustes do Sistema → Privacidade e Segurança e tente novamente."
 }

@@ -151,7 +151,7 @@ const collect = <E>(stream: Stream.Stream<Uint8Array, E>) =>
   );
 /** Gradle needs the SDK location; fall back to Android Studio's default install like the device host does. */
 export const androidSdk = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
+  const platform = yield* HostProcess.Platform;
   const path = yield* Path.Path;
   const environment = yield* HostProcess.Environment;
   const home = environment.HOME ?? environment.USERPROFILE ?? "";
@@ -164,8 +164,8 @@ export const androidSdk = Effect.gen(function* () {
   ];
   for (const sdk of candidates) {
     if (!sdk) continue;
-    const platformTools = path.join(sdk, "platform-tools");
-    if (yield* fs.exists(platformTools).pipe(Effect.orElseSucceed(() => false))) return sdk;
+    const adb = path.join(sdk, "platform-tools", platform === "win32" ? "adb.exe" : "adb");
+    if (yield* isCommandAvailable(adb)) return sdk;
   }
   return undefined;
 });
@@ -175,10 +175,7 @@ export const resolveAdb = Effect.gen(function* () {
   const path = yield* Path.Path;
   const executable = (yield* HostProcess.Platform) === "win32" ? "adb.exe" : "adb";
   const sdk = yield* androidSdk;
-  if (sdk) {
-    const candidate = path.join(sdk, "platform-tools", executable);
-    if (yield* isCommandAvailable(candidate)) return candidate;
-  }
+  if (sdk) return path.join(sdk, "platform-tools", executable);
   return yield* new NativeClientError({
     message:
       "adb was not found on PATH, in ANDROID_HOME/ANDROID_SDK_ROOT, or in Android Studio's default SDK location. Install Android SDK platform-tools.",

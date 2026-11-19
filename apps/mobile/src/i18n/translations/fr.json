@@ -13,8 +13,6 @@
   "7953122755efa56e": "Résolution des deltas",
   "d9a8c7734f54ea3f": "Extraction des fichiers",
   "215fbed6f97db37d": "Bloqué",
-  "b5899546709c27ef": "{organization} gère les mises à jour de T3 Code.",
-  "4160b5f3b4d6ccb0": "{organization} gère les mises à jour de T3 Code. Seules les versions stables peuvent être installées.",
   "6365146db77a8dac": "{organization} limite les fils au mode Supervisé.",
   "2aa1c01bf8014725": "{organization} limite les fils au mode Acceptation auto des modifications.",
   "89563a8fff8bb751": "{organization} limite les fils au mode Auto.",
@@ -30,7 +28,6 @@
   "a78eb961f5618e7f": "Non installé sur cette machine.",
   "4c34e647dc74b279": "Nécessite l’accès au Trousseau pour lire ses cookies.",
   "a613ba1b6f32fc2c": "Aucune clé de chiffrement dans votre Trousseau. Connectez-vous une fois à ce navigateur, puis réessayez.",
-  "322d9662c37ead48": "Accordez à T3 Code l’accès complet au disque dans Réglages Système → Confidentialité et sécurité, puis réessayez.",
   "24fdd54c2321912a": "Quittez d’abord le navigateur pour que sa base de cookies puisse être lue.",
   "1e3857bfd41528f6": "L’import depuis ce navigateur n’est pas possible sur cette plateforme.",
   "2bfa3f72b8bb8657": "Impossible d’accéder au trousseau du système. Vérifiez que le trousseau de votre bureau est lancé et déverrouillé, puis réessayez.",
@@ -5207,5 +5204,8 @@
   "fc67e3ef7fa8e70e": "Impossible d’épingler globalement",
   "9822903f8c06cdb3": "Mettez à jour le serveur de cet environnement pour épingler globalement.",
   "5a1fa6be27e76393": "Impossible de mettre à jour la marque d’urgence",
-  "951d270f25257ba6": "La marque d’urgence n’a pas pu être modifiée."
+  "951d270f25257ba6": "La marque d’urgence n’a pas pu être modifiée.",
+  "e5302d49cb51dfc0": "{organization} gère les mises à jour de D5 Code.",
+  "332a0b7fcace64fc": "{organization} gère les mises à jour de D5 Code. Seules les versions stables peuvent être installées.",
+  "20f78cb23fce294a": "Accordez à D5 Code l’accès complet au disque dans Réglages Système → Confidentialité et sécurité, puis réessayez."
 }
