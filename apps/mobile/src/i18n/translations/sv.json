@@ -486,7 +486,6 @@
   "d4258d4b87cf0ab1": "Reläet råkade ut för ett internt fel ({reason}).",
   "796de796c15cf68f": "Reläet fick timeout innan begäran var klar (HTTP 504). Försök igen om några minuter. Om det fortsätter att misslyckas, kopiera spårnings-ID:t när du rapporterar det.",
   "34e963f61ae55b28": "Reläet returnerade en oväntad HTTP {status}.",
-  "e17ef8aff174e6fe": "Har varit offline ett tag, så dess T3 Connect-tunnel togs bort. Starta T3 Code på den datorn och uppdatera till den senaste versionen för att återansluta.",
   "e07aeb67f54ee2c4": "Kunde inte läsa in reläets DPoP-bevisnyckel.",
   "0d7264480ef70038": "Tidsgränsen nåddes vid utbyte av reläets DPoP-åtkomsttoken.",
   "b396dce04e615665": "Tidsgränsen nåddes vid listning av reläets miljöer.",
@@ -996,11 +995,7 @@
   "84574fdbc300e71f": "{name} (installation, när klar)",
   "8113ce8cc5b8714a": "{name} (installation)",
   "305480cd87405b73": "{name} (när klar)",
-  "0553a5ffe0a59780": "Den här prompten är längre än {maxLength} tecken, så T3 Code öppnade den inte.",
-  "5d559770ea1ee096": "Den här prompten innehöll bara dolda tecken, så den kan vara skadlig. T3 Code öppnade den inte.",
-  "4410caad205bcac7": "Den här länken pekar på en pull request som T3 Code inte kan läsa.",
   "df1915cc1c939ef9": "Den här länken har ingen prompt.",
-  "6024bfa21d5b2f40": "Den här länken pekar på ett repo som T3 Code inte kan läsa.",
   "207267a58d3542ba": "När du stoppar skickar {environment} inspelningen till OpenRouter. OpenRouter väljer vem som kör din modell. T3 begär att ingen data sparas; ditt OpenRouter-konto kan tillåta lagring av säkerhetsskäl.",
   "81b64c298285297c": "När du stoppar skickar {environment} din inspelning och dina ordförrådstips, inklusive projektnamn, till {provider}.",
   "615ce9f2edf7208f": "Länka en pull request",
@@ -5213,5 +5208,10 @@
   "951d270f25257ba6": "Brådskandemarkeringen kunde inte ändras.",
   "e5302d49cb51dfc0": "{organization} hanterar uppdateringar av D5 Code.",
   "332a0b7fcace64fc": "{organization} hanterar uppdateringar av D5 Code. Bara stabila versioner kan installeras.",
-  "20f78cb23fce294a": "Ge D5 Code Full skivåtkomst i Systeminställningar → Integritet och säkerhet och försök sedan igen."
+  "20f78cb23fce294a": "Ge D5 Code Full skivåtkomst i Systeminställningar → Integritet och säkerhet och försök sedan igen.",
+  "742bfda2a226dabc": "Har varit offline ett tag, så dess T3 Connect-tunnel togs bort. Starta D5 Code på den datorn och uppdatera till den senaste versionen för att återansluta.",
+  "25dc4bdfdb3908bf": "Den här prompten är längre än {maxLength} tecken, så D5 Code öppnade den inte.",
+  "7e099a8cf01ca1fa": "Den här prompten innehöll bara dolda tecken, så den kan vara skadlig. D5 Code öppnade den inte.",
+  "020d08c4df233602": "Den här länken pekar på en pull request som D5 Code inte kan läsa.",
+  "a7a0c1bca0b9df97": "Den här länken pekar på ett repo som D5 Code inte kan läsa."
 }

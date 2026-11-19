@@ -14,7 +14,7 @@ import { msg } from "gt-react";
 import { create } from "zustand";
 
 import { toastManager } from "./components/ui/toast";
-import { m } from "./i18n/messages";
+import { getActiveLocale, m } from "./i18n/messages";
 import { randomUUID } from "./lib/utils";
 import { appAtomRegistry } from "./rpc/atomRegistry";
 import { parseLegacySidebarFolders, planLegacySidebarFolderImport } from "./sidebarFolderImport";
@@ -39,9 +39,12 @@ export function matchesTagFilter(
   return mode === "all" ? filter.every(tagged) : filter.some(tagged);
 }
 
-/** The filter as a phrase: "tagged Active or Mobile", "tagged Active and Mobile", "without Active or Mobile". */
-export const describeTagFilter = (filter: readonly string[], mode: TagFilterMode) =>
-  `${mode === "none" ? "without" : "tagged"} ${filter.join(mode === "all" ? " and " : " or ")}`;
+export function describeTagFilter(filter: readonly string[], mode: TagFilterMode): string {
+  const tags = new Intl.ListFormat(getActiveLocale(), {
+    type: mode === "all" ? "conjunction" : "disjunction",
+  }).format(filter);
+  return mode === "none" ? m(msg("without {tags}"), { tags }) : m(msg("tagged {tags}"), { tags });
+}
 
 interface SidebarTagsStore {
   /** Tag names, one per name however many environments hold it. */

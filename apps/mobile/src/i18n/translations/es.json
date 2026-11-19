@@ -486,7 +486,6 @@
   "d4258d4b87cf0ab1": "El relay encontró un error interno ({reason}).",
   "796de796c15cf68f": "Se agotó el tiempo de espera del relay antes de terminar la solicitud (HTTP 504). Vuelve a intentarlo en unos minutos. Si sigue fallando, copia el ID de traza cuando lo informes.",
   "34e963f61ae55b28": "El relay devolvió un HTTP {status} inesperado.",
-  "e17ef8aff174e6fe": "Estuvo sin conexión un tiempo, así que se eliminó su túnel de T3 Connect. Inicia T3 Code en ese equipo y actualízalo a la última versión para volver a conectar.",
   "e07aeb67f54ee2c4": "No se pudo cargar la clave de prueba DPoP del relay.",
   "0d7264480ef70038": "Se agotó el tiempo del intercambio del token de acceso DPoP del relay.",
   "b396dce04e615665": "Se agotó el tiempo al listar los entornos del relay.",
@@ -996,11 +995,7 @@
   "84574fdbc300e71f": "{name} (configuración, al resolver)",
   "8113ce8cc5b8714a": "{name} (configuración)",
   "305480cd87405b73": "{name} (al resolver)",
-  "0553a5ffe0a59780": "Este prompt tiene más de {maxLength} caracteres, así que T3 Code no lo abrió.",
-  "5d559770ea1ee096": "Este prompt solo tenía caracteres ocultos, así que puede ser malicioso. T3 Code no lo abrió.",
-  "4410caad205bcac7": "Este enlace apunta a una pull request que T3 Code no puede leer.",
   "df1915cc1c939ef9": "Este enlace no tiene prompt.",
-  "6024bfa21d5b2f40": "Este enlace apunta a un repositorio que T3 Code no puede leer.",
   "207267a58d3542ba": "Cuando te detengas, {environment} envía la grabación a OpenRouter. OpenRouter elige quién ejecuta tu modelo. T3 solicita retención de datos cero; tu cuenta de OpenRouter puede permitir la retención por seguridad.",
   "81b64c298285297c": "Cuando te detengas, {environment} envía tu grabación y las pistas de vocabulario, incluidos los nombres de proyecto, a {provider}.",
   "615ce9f2edf7208f": "Vincular una pull request",
@@ -5207,5 +5202,10 @@
   "951d270f25257ba6": "No se pudo cambiar la marca de urgente.",
   "e5302d49cb51dfc0": "{organization} gestiona las actualizaciones de D5 Code.",
   "332a0b7fcace64fc": "{organization} gestiona las actualizaciones de D5 Code. Solo se pueden instalar versiones estables.",
-  "20f78cb23fce294a": "Concede a D5 Code acceso total al disco en Ajustes del Sistema → Privacidad y seguridad y vuelve a intentarlo."
+  "20f78cb23fce294a": "Concede a D5 Code acceso total al disco en Ajustes del Sistema → Privacidad y seguridad y vuelve a intentarlo.",
+  "742bfda2a226dabc": "Estuvo sin conexión un tiempo, así que se eliminó su túnel de T3 Connect. Inicia D5 Code en ese equipo y actualízalo a la última versión para volver a conectar.",
+  "25dc4bdfdb3908bf": "Este prompt tiene más de {maxLength} caracteres, así que D5 Code no lo abrió.",
+  "7e099a8cf01ca1fa": "Este prompt solo tenía caracteres ocultos, así que puede ser malicioso. D5 Code no lo abrió.",
+  "020d08c4df233602": "Este enlace apunta a una pull request que D5 Code no puede leer.",
+  "a7a0c1bca0b9df97": "Este enlace apunta a un repositorio que D5 Code no puede leer."
 }

@@ -244,7 +244,7 @@ export function useThreadActionMenu(input: {
           await reportFailure(m(msg("Failed to wake thread")), () => unsnoozeThread(threadRef));
           return;
         case "global-pin":
-          await reportFailure(m(msg("Failed to Pin Globally thread")), () =>
+          await reportFailure(m(msg("Could not pin globally")), () =>
             pinThread(threadRef, { globallyPinned: true }),
           );
           return;

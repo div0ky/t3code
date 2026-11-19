@@ -486,7 +486,6 @@
   "d4258d4b87cf0ab1": "Im Relay ist ein interner Fehler aufgetreten ({reason}).",
   "796de796c15cf68f": "Zeitüberschreitung des Relays vor Abschluss der Anfrage (HTTP 504). Versuche es in ein paar Minuten erneut. Wenn es weiter fehlschlägt, kopiere beim Melden die Trace-ID.",
   "34e963f61ae55b28": "Das Relay hat unerwartet HTTP {status} zurückgegeben.",
-  "e17ef8aff174e6fe": "Eine Weile offline, daher wurde der T3-Connect-Tunnel entfernt. Starte T3 Code auf diesem Computer und aktualisiere es auf die neueste Version, um die Verbindung wiederherzustellen.",
   "e07aeb67f54ee2c4": "Der DPoP-Nachweisschlüssel des Relays konnte nicht geladen werden.",
   "0d7264480ef70038": "Zeitüberschreitung beim Austausch des DPoP-Zugriffstokens des Relays.",
   "b396dce04e615665": "Zeitüberschreitung beim Auflisten der Relay-Umgebungen.",
@@ -996,11 +995,7 @@
   "84574fdbc300e71f": "{name} (Setup, beim Erledigen)",
   "8113ce8cc5b8714a": "{name} (Setup)",
   "305480cd87405b73": "{name} (beim Erledigen)",
-  "0553a5ffe0a59780": "Dieser Prompt ist länger als {maxLength} Zeichen, daher hat T3 Code ihn nicht geöffnet.",
-  "5d559770ea1ee096": "Dieser Prompt enthielt nur unsichtbare Zeichen und ist daher möglicherweise schädlich. T3 Code hat ihn nicht geöffnet.",
-  "4410caad205bcac7": "Dieser Link verweist auf einen Pull Request, den T3 Code nicht lesen kann.",
   "df1915cc1c939ef9": "Dieser Link enthält keinen Prompt.",
-  "6024bfa21d5b2f40": "Dieser Link verweist auf ein Repository, das T3 Code nicht lesen kann.",
   "207267a58d3542ba": "Wenn du stoppst, sendet {environment} die Aufnahme an OpenRouter. OpenRouter wählt aus, wer dein Modell ausführt. T3 fordert keine Datenspeicherung an; dein OpenRouter-Konto erlaubt möglicherweise eine Speicherung aus Sicherheitsgründen.",
   "81b64c298285297c": "Wenn du stoppst, sendet {environment} deine Aufnahme und Vokabelhinweise, einschließlich Projektnamen, an {provider}.",
   "615ce9f2edf7208f": "Pull Request verknüpfen",
@@ -5213,5 +5208,10 @@
   "951d270f25257ba6": "Die Dringlichkeitsmarkierung konnte nicht geändert werden.",
   "e5302d49cb51dfc0": "{organization} verwaltet die Updates von D5 Code.",
   "332a0b7fcace64fc": "{organization} verwaltet die Updates von D5 Code. Nur stabile Versionen können installiert werden.",
-  "20f78cb23fce294a": "Gib D5 Code in Systemeinstellungen → Datenschutz & Sicherheit den Festplattenvollzugriff und versuche es dann erneut."
+  "20f78cb23fce294a": "Gib D5 Code in Systemeinstellungen → Datenschutz & Sicherheit den Festplattenvollzugriff und versuche es dann erneut.",
+  "742bfda2a226dabc": "Eine Weile offline, daher wurde der T3-Connect-Tunnel entfernt. Starte D5 Code auf diesem Computer und aktualisiere es auf die neueste Version, um die Verbindung wiederherzustellen.",
+  "25dc4bdfdb3908bf": "Dieser Prompt ist länger als {maxLength} Zeichen, daher hat D5 Code ihn nicht geöffnet.",
+  "7e099a8cf01ca1fa": "Dieser Prompt enthielt nur unsichtbare Zeichen und ist daher möglicherweise schädlich. D5 Code hat ihn nicht geöffnet.",
+  "020d08c4df233602": "Dieser Link verweist auf einen Pull Request, den D5 Code nicht lesen kann.",
+  "a7a0c1bca0b9df97": "Dieser Link verweist auf ein Repository, das D5 Code nicht lesen kann."
 }

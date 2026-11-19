@@ -209,7 +209,7 @@ const PACKAGE_FIELD_TEXT: ReadonlyMap<string, string> = new Map([
   ],
   ["Path to the OpenCode binary.", msg("Path to the OpenCode binary.")],
   [
-    "Leave blank to let T3 Code spawn the server when needed.",
+    "Leave blank to let D5 Code spawn the server when needed.",
     msg("Leave blank to let D5 Code spawn the server when needed."),
   ],
   ["Stored separately on the host.", msg("Stored separately on the host.")],

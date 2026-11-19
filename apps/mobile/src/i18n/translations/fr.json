@@ -486,7 +486,6 @@
   "d4258d4b87cf0ab1": "Le relais a rencontré une erreur interne ({reason}).",
   "796de796c15cf68f": "Le relais a expiré avant de terminer la requête (HTTP 504). Réessayez dans quelques minutes. Si l’échec persiste, copiez l’ID de trace lorsque vous le signalez.",
   "34e963f61ae55b28": "Le relais a renvoyé un HTTP {status} inattendu.",
-  "e17ef8aff174e6fe": "Hors ligne depuis un moment, son tunnel T3 Connect a donc été supprimé. Lancez T3 Code sur cet ordinateur et mettez-le à jour vers la dernière version pour vous reconnecter.",
   "e07aeb67f54ee2c4": "Impossible de charger la clé de preuve DPoP du relais.",
   "0d7264480ef70038": "Délai dépassé pour l’échange du jeton d’accès DPoP du relais.",
   "b396dce04e615665": "Délai dépassé pour la liste des environnements du relais.",
@@ -996,11 +995,7 @@
   "84574fdbc300e71f": "{name} (configuration, à la clôture)",
   "8113ce8cc5b8714a": "{name} (configuration)",
   "305480cd87405b73": "{name} (à la clôture)",
-  "0553a5ffe0a59780": "Ce prompt dépasse {maxLength} caractères, T3 Code ne l’a donc pas ouvert.",
-  "5d559770ea1ee096": "Ce prompt ne contenait que des caractères masqués, il est peut-être malveillant. T3 Code ne l’a pas ouvert.",
-  "4410caad205bcac7": "Ce lien désigne une pull request que T3 Code ne peut pas lire.",
   "df1915cc1c939ef9": "Ce lien ne contient aucun prompt.",
-  "6024bfa21d5b2f40": "Ce lien désigne un dépôt que T3 Code ne peut pas lire.",
   "207267a58d3542ba": "Une fois l’enregistrement arrêté, {environment} l’envoie à OpenRouter. OpenRouter choisit qui exécute votre modèle. T3 demande une conservation nulle des données ; votre compte OpenRouter peut autoriser une conservation à des fins de sécurité.",
   "81b64c298285297c": "Une fois l’enregistrement arrêté, {environment} envoie votre enregistrement et des indications de vocabulaire, y compris les noms de projets, à {provider}.",
   "615ce9f2edf7208f": "Associer une pull request",
@@ -5207,5 +5202,10 @@
   "951d270f25257ba6": "La marque d’urgence n’a pas pu être modifiée.",
   "e5302d49cb51dfc0": "{organization} gère les mises à jour de D5 Code.",
   "332a0b7fcace64fc": "{organization} gère les mises à jour de D5 Code. Seules les versions stables peuvent être installées.",
-  "20f78cb23fce294a": "Accordez à D5 Code l’accès complet au disque dans Réglages Système → Confidentialité et sécurité, puis réessayez."
+  "20f78cb23fce294a": "Accordez à D5 Code l’accès complet au disque dans Réglages Système → Confidentialité et sécurité, puis réessayez.",
+  "742bfda2a226dabc": "Hors ligne depuis un moment, son tunnel T3 Connect a donc été supprimé. Lancez D5 Code sur cet ordinateur et mettez-le à jour vers la dernière version pour vous reconnecter.",
+  "25dc4bdfdb3908bf": "Ce prompt dépasse {maxLength} caractères, D5 Code ne l’a donc pas ouvert.",
+  "7e099a8cf01ca1fa": "Ce prompt ne contenait que des caractères masqués, il est peut-être malveillant. D5 Code ne l’a pas ouvert.",
+  "020d08c4df233602": "Ce lien désigne une pull request que D5 Code ne peut pas lire.",
+  "a7a0c1bca0b9df97": "Ce lien désigne un dépôt que D5 Code ne peut pas lire."
 }

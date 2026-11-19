@@ -530,7 +530,7 @@ export const make = Effect.gen(function* () {
       target,
       next: null,
       wake: {
-        text: `Pull request #${target.link.number} (${target.link.url}) was closed, so T3 Code stopped watching it. Call watch_pull_request if it reopens.`,
+        text: `Pull request #${target.link.number} (${target.link.url}) was closed, so D5 Code stopped watching it. Call watch_pull_request if it reopens.`,
         notification: {
           source: { kind: "monitor" },
           outcome: "updated",
