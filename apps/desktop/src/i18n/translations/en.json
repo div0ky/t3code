@@ -31,7 +31,7 @@
   "86fe6451f52e722a": "Fingerprint: {fingerprint}",
   "7b20c92539acb4b6": "Trust it only if you know this certificate belongs to the site. Clearing this browser profile's cookies forgets it.",
   "c67ec08c2c8d0cd9": "Could not trust the certificate for {host}",
-  "935a340963533dcf": "T3 Code could not save this approval, so the page stays blocked. Check that the disk is not full and its data folder is writable, then try again.",
+  "418233a6e8bd5a7c": "D5 Code could not save this approval, so the page stays blocked. Check that the disk is not full and its data folder is writable, then try again.",
   "a0315d43e8e5be7e": "Allow",
   "2ec823ca24387055": "Block",
   "8fc0b116123fb50b": "{origin} wants to see text and images copied to the clipboard",

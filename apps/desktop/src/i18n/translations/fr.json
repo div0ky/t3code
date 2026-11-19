@@ -31,7 +31,7 @@
   "86fe6451f52e722a": "Empreinte : {fingerprint}",
   "7b20c92539acb4b6": "Faites-lui confiance uniquement si vous savez que ce certificat appartient au site. Effacer les cookies de ce profil de navigateur l’oublie.",
   "c67ec08c2c8d0cd9": "Impossible de faire confiance au certificat de {host}",
-  "935a340963533dcf": "T3 Code n’a pas pu enregistrer cette approbation, la page reste donc bloquée. Vérifiez que le disque n’est pas plein et que son dossier de données est accessible en écriture, puis réessayez.",
+  "418233a6e8bd5a7c": "D5 Code n’a pas pu enregistrer cette approbation, la page reste donc bloquée. Vérifiez que le disque n’est pas plein et que son dossier de données est accessible en écriture, puis réessayez.",
   "a0315d43e8e5be7e": "Autoriser",
   "2ec823ca24387055": "Bloquer",
   "8fc0b116123fb50b": "{origin} veut voir le texte et les images copiés dans le presse-papiers",
