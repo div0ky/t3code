@@ -1,3 +1,6 @@
+import { msg } from "gt-react";
+
+import { m, type MessageResolver } from "~/i18n/messages";
 import type { ComposerCommandItem } from "./ComposerCommandMenu";
 
 const tagKey = (name: string) => name.trim().toLocaleLowerCase();
@@ -6,12 +9,15 @@ const tagKey = (name: string) => name.trim().toLocaleLowerCase();
  * Tags for what is typed after `#`. The closest name comes first, and among equals the tags the
  * thread lacks do, so Enter on `#act` adds a tag before it removes one.
  */
-export function matchComposerTagItems(input: {
-  readonly tags: readonly string[];
-  /** Tags already on the thread; a new chat's may not be saved yet, so they are offered too. */
-  readonly applied: readonly string[];
-  readonly query: string;
-}): Extract<ComposerCommandItem, { type: "tag" }>[] {
+export function matchComposerTagItems(
+  input: {
+    readonly tags: readonly string[];
+    /** Tags already on the thread; a new chat's may not be saved yet, so they are offered too. */
+    readonly applied: readonly string[];
+    readonly query: string;
+  },
+  resolve: MessageResolver = m,
+): Extract<ComposerCommandItem, { type: "tag" }>[] {
   const needle = tagKey(input.query);
   const appliedKeys = new Set(input.applied.map(tagKey));
   const storedKeys = new Set(input.tags.map(tagKey));
@@ -27,7 +33,9 @@ export function matchComposerTagItems(input: {
       name,
       tagged,
       label: `#${name}`,
-      description: tagged ? "On this thread. Select to remove." : "Tag this thread",
+      description: tagged
+        ? resolve(msg("On this thread. Select to remove."))
+        : resolve(msg("Tag this thread")),
     }));
 }
 

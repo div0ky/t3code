@@ -10,9 +10,11 @@ import {
   type SidebarTagOperation,
   type ThreadId,
 } from "@t3tools/contracts";
+import { msg } from "gt-react";
 import { create } from "zustand";
 
 import { toastManager } from "./components/ui/toast";
+import { m } from "./i18n/messages";
 import { randomUUID } from "./lib/utils";
 import { appAtomRegistry } from "./rpc/atomRegistry";
 import { parseLegacySidebarFolders, planLegacySidebarFolderImport } from "./sidebarFolderImport";
@@ -195,8 +197,8 @@ async function send(
   if (reportFailure) {
     toastManager.add({
       type: "error",
-      title: "Could not update tags",
-      description: "This server may need an update. Your change was not saved.",
+      title: m(msg("Could not update tags")),
+      description: m(msg("This server may need an update. Your change was not saved.")),
     });
   }
   return false;
@@ -247,8 +249,8 @@ function dispatchUserActions(
   }
   toastManager.add({
     type: "error",
-    title: "Tags unavailable",
-    description: "This connection cannot change tags in this environment.",
+    title: m(msg("Tags unavailable")),
+    description: m(msg("This connection cannot change tags in this environment.")),
   });
 }
 

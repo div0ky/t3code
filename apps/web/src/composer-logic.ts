@@ -9,13 +9,21 @@ import {
   serializeAssistantCitation,
   withAssistantCitationComment,
 } from "@t3tools/shared/assistantCitations";
-import { isCurrencyAmountQuery, isPathWord } from "@t3tools/shared/composerTrigger";
+import {
+  detectComposerPullRequestTrigger,
+  isCurrencyAmountQuery,
+  isPathWord,
+} from "@t3tools/shared/composerTrigger";
 import {
   splitPromptIntoComposerSegments,
   type ComposerPromptSegment,
 } from "./composer-editor-mentions";
 
-import { resolveShortcutCommand, type ShortcutEventLike } from "./keybindings";
+import {
+  resolveShortcutCommand,
+  type ShortcutEventLike,
+  type ShortcutMatchContext,
+} from "./keybindings";
 
 export type ComposerTriggerKind = "path" | "pull-request" | "slash-command" | "skill" | "tag";
 export type ComposerSlashCommand = "model" | "side" | "btw" | "clear";
@@ -59,6 +67,8 @@ export function composerRequiresModifier(
 export function composerSubmissionIntentForKey(input: {
   event: ShortcutEventLike & { isComposing?: boolean; keyCode?: number; repeat?: boolean };
   keybindings: ResolvedKeybindingsConfig;
+  /** The when-clause context ChatView's shortcut listeners see, so both resolve Enter alike. */
+  context: Partial<ShortcutMatchContext>;
   platform?: string;
   isSoftwareKeyboardOpen: boolean;
   isDraftThread: boolean;
@@ -73,6 +83,7 @@ export function composerSubmissionIntentForKey(input: {
   const command = resolveShortcutCommand(event, input.keybindings, {
     ...(input.platform === undefined ? {} : { platform: input.platform }),
     context: {
+      ...input.context,
       composerFocus: true,
       draftThreadRoute: input.isDraftThread,
       turnRunning: input.isRunning === true,
@@ -261,14 +272,14 @@ export function detectComposerTrigger(text: string, cursorInput: number): Compos
       rangeEnd: cursor,
     };
   }
-  const hashMatch = /^(##?)([\p{L}\p{N}][\p{L}\p{N}_-]*)?$/u.exec(token);
-  if (hashMatch) {
-    return {
-      kind: hashMatch[1] === "##" ? "pull-request" : "tag",
-      query: hashMatch[2] ?? "",
-      rangeStart: tokenStart,
-      rangeEnd: cursor,
-    };
+  const pullRequestTrigger = detectComposerPullRequestTrigger(token, cursor);
+  if (pullRequestTrigger) return pullRequestTrigger;
+  const tagMatch = /^[@\p{Sc}]/u.test(token)
+    ? null
+    : /(?:^|\p{Ps})#([\p{L}\p{N}][\p{L}\p{N}_-]*)?$/u.exec(token);
+  if (tagMatch) {
+    const query = tagMatch[1] ?? "";
+    return { kind: "tag", query, rangeStart: cursor - query.length - 1, rangeEnd: cursor };
   }
   const skillPrefix = /^\p{Sc}/u.exec(token);
   if (skillPrefix) {

@@ -1,5 +1,6 @@
 import { CollapsibleSectionHeader } from "../ui/collapsible-section-header";
 import { useSortable } from "@dnd-kit/sortable";
+import { T } from "gt-react";
 import { FlameIcon } from "lucide-react";
 import { CSS } from "@dnd-kit/utilities";
 import { type ReactNode, useLayoutEffect } from "react";
@@ -134,7 +135,9 @@ export function SidebarUrgentHeader(props: { count: number }) {
     >
       <div className="flex h-8 items-center gap-2 px-2 text-xs font-medium text-error-foreground">
         <FlameIcon aria-hidden className="size-3.5 shrink-0" />
-        <span className="flex-1">Urgent</span>
+        <span className="flex-1">
+          <T>Urgent</T>
+        </span>
         <span className="font-normal tabular-nums">{props.count}</span>
       </div>
     </SortableSidebarMarker>

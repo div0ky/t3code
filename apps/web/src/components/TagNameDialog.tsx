@@ -1,3 +1,4 @@
+import { T } from "gt-react";
 import { useEffect, useId, useState } from "react";
 import { create } from "zustand";
 
@@ -65,7 +66,9 @@ function TagNameDialog({ request }: { request: Request }) {
           </DialogHeader>
           <DialogPanel>
             <div className="flex flex-col gap-2">
-              <Label htmlFor={`${id}-name`}>Name</Label>
+              <Label htmlFor={`${id}-name`}>
+                <T>Name</T>
+              </Label>
               <Input
                 id={`${id}-name`}
                 autoFocus
@@ -78,10 +81,10 @@ function TagNameDialog({ request }: { request: Request }) {
           </DialogPanel>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => finish(null)}>
-              Cancel
+              <T>Cancel</T>
             </Button>
             <Button type="submit" disabled={trimmed.length === 0}>
-              Save
+              <T>Save</T>
             </Button>
           </DialogFooter>
         </form>

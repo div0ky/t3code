@@ -1,3 +1,4 @@
+import { useGT } from "gt-react";
 import { useEffect, useState } from "react";
 import { create } from "zustand";
 
@@ -35,6 +36,7 @@ export function ThreadTagPickerHost() {
 
 /** Stays open while tags are toggled, so several go on in one visit. */
 function ThreadTagPicker({ request }: { request: Request }) {
+  const gt = useGT();
   const { position } = request;
   const draftId = "draftId" in request ? request.draftId : null;
   const threadKeys = "threadKeys" in request ? request.threadKeys : [];
@@ -81,15 +83,17 @@ function ThreadTagPicker({ request }: { request: Request }) {
         side="bottom"
         padding="compact"
         width="sm"
-        aria-label={targetCount > 1 ? `Tags for ${targetCount} threads` : "Tags"}
+        aria-label={
+          targetCount > 1 ? gt("Tags for {count} threads", { count: targetCount }) : gt("Tags")
+        }
       >
         <div className="flex flex-col gap-2">
           <Input
             autoFocus
             value={query}
             maxLength={48}
-            aria-label="Find or create a tag"
-            placeholder={tags.length === 0 ? "Name a new tag" : "Find or create a tag"}
+            aria-label={gt("Find or create a tag")}
+            placeholder={tags.length === 0 ? gt("Name a new tag") : gt("Find or create a tag")}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={(event) => {
               if (event.key !== "Enter" || event.nativeEvent.isComposing || name.length === 0) {
@@ -124,7 +128,9 @@ function ThreadTagPicker({ request }: { request: Request }) {
           </ul>
           {name.length > 0 && exact === undefined ? (
             <p className="px-2 text-secondary-label text-xs">
-              {shown.length === 1 ? `Enter toggles ${shown[0]}` : `Enter creates “${name}”`}
+              {shown.length === 1
+                ? gt("Enter toggles {tag}", { tag: shown[0] })
+                : gt("Enter creates “{name}”", { name })}
             </p>
           ) : null}
         </div>

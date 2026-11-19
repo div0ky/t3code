@@ -1,4 +1,5 @@
 import type { EnvironmentId } from "@t3tools/contracts";
+import { msg, T, useGT, useMessages } from "gt-react";
 import { TagIcon } from "lucide-react";
 
 import { describeTagFilter, useSidebarTagsStore } from "../../sidebarTagsStore";
@@ -27,6 +28,8 @@ export function SidebarTagFilter(props: {
   environmentId: EnvironmentId | null;
   onFilterChange: () => void;
 }) {
+  const gt = useGT();
+  const m = useMessages();
   const tags = useSidebarTagsStore((store) => store.tags);
   const filter = useSidebarTagsStore((store) => store.filter);
   const filterMode = useSidebarTagsStore((store) => store.filterMode);
@@ -38,8 +41,10 @@ export function SidebarTagFilter(props: {
           <SidebarHeaderIconButton
             label={
               filter.length > 0
-                ? `Showing threads ${describeTagFilter(filter, filterMode)}`
-                : "Filter threads by tag"
+                ? gt("Showing threads {tagFilter}", {
+                    tagFilter: describeTagFilter(filter, filterMode),
+                  })
+                : gt("Filter threads by tag")
             }
           />
         }
@@ -59,10 +64,10 @@ export function SidebarTagFilter(props: {
         <MenuGroup>
           <MenuGroupLabel>
             {tags.length === 0
-              ? "No tags yet"
+              ? gt("No tags yet")
               : filterMode === "none"
-                ? "Hide threads tagged"
-                : "Show threads tagged"}
+                ? gt("Hide threads tagged")
+                : gt("Show threads tagged")}
           </MenuGroupLabel>
           {tags.map((name) => (
             <MenuCheckboxItem
@@ -82,7 +87,9 @@ export function SidebarTagFilter(props: {
           <>
             <MenuSeparator />
             <MenuGroup>
-              <MenuGroupLabel>Match</MenuGroupLabel>
+              <MenuGroupLabel>
+                <T context="tag filter mode">Match</T>
+              </MenuGroupLabel>
               <MenuRadioGroup
                 value={filterMode}
                 onValueChange={(mode) => {
@@ -92,14 +99,14 @@ export function SidebarTagFilter(props: {
               >
                 {(
                   [
-                    ["any", "Any tag (OR)"],
-                    ["all", "All tags (AND)"],
-                    ["none", "None of them (NOT)"],
+                    ["any", msg("Any tag (OR)")],
+                    ["all", msg("All tags (AND)")],
+                    ["none", msg("None of them (NOT)")],
                   ] as const
                 ).map(([mode, label]) => (
                   <MenuRadioItem key={mode} value={mode} closeOnClick={false}>
                     <span className="flex items-center justify-between gap-2">
-                      {label}
+                      {m(label)}
                       <MenuRadioItemIndicator />
                     </span>
                   </MenuRadioItem>
@@ -116,28 +123,30 @@ export function SidebarTagFilter(props: {
             props.onFilterChange();
           }}
         >
-          Show all threads
+          <T>Show all threads</T>
         </MenuItem>
         <MenuSeparator />
         <MenuItem
           onClick={() =>
-            void requestTagName({ title: "New tag" }).then((name) => {
+            void requestTagName({ title: gt("New tag") }).then((name) => {
               if (name !== null) actions().createTag(name, props.environmentId);
             })
           }
         >
-          New tag…
+          <T>New tag…</T>
         </MenuItem>
         {tags.length > 0 ? (
           <>
             <MenuSub>
-              <MenuSubTrigger>Rename tag</MenuSubTrigger>
+              <MenuSubTrigger>
+                <T>Rename tag</T>
+              </MenuSubTrigger>
               <MenuSubPopup>
                 {tags.map((name) => (
                   <MenuItem
                     key={name}
                     onClick={() =>
-                      void requestTagName({ title: "Rename tag", name }).then((next) => {
+                      void requestTagName({ title: gt("Rename tag"), name }).then((next) => {
                         if (next !== null) actions().renameTag(name, next);
                       })
                     }
@@ -148,7 +157,9 @@ export function SidebarTagFilter(props: {
               </MenuSubPopup>
             </MenuSub>
             <MenuSub>
-              <MenuSubTrigger>Delete tag</MenuSubTrigger>
+              <MenuSubTrigger>
+                <T>Delete tag</T>
+              </MenuSubTrigger>
               <MenuSubPopup>
                 {tags.map((name) => (
                   // Its threads stay where they are; only the tag goes.

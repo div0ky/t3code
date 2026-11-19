@@ -1,3 +1,5 @@
+import { T, useGT } from "gt-react";
+
 import { useSidebarTagsStore } from "../sidebarTagsStore";
 import { ComposerControl } from "./chat/ComposerControl";
 import { ComposerContextLabel } from "./ComposerContextLabel";
@@ -7,8 +9,10 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 
 /** Tags for a new chat, chosen before its first send. */
 export function ComposerContextTags({ draftId }: { draftId: string }) {
+  const gt = useGT();
   const tags = useSidebarTagsStore((store) => store.draftTags[draftId]);
-  const label = tags === undefined || tags.length === 0 ? "Tags" : tags.join(", ");
+  const untagged = tags === undefined || tags.length === 0;
+  const label = untagged ? gt("Tags") : tags.join(", ");
   return (
     <Tooltip>
       <TooltipTrigger
@@ -16,7 +20,7 @@ export function ComposerContextTags({ draftId }: { draftId: string }) {
           <ComposerControl
             size="xs"
             className="min-w-0 shrink"
-            aria-label={`Tags: ${tags === undefined || tags.length === 0 ? "none" : label}`}
+            aria-label={untagged ? gt("Tags: none") : gt("Tags: {tags}", { tags: label })}
             data-composer-context-control
             onClick={(event) => {
               const rect = event.currentTarget.getBoundingClientRect();
@@ -28,7 +32,9 @@ export function ComposerContextTags({ draftId }: { draftId: string }) {
         <TagPulseIcon target={draftId} className="size-3" />
         <ComposerContextLabel>{label}</ComposerContextLabel>
       </TooltipTrigger>
-      <TooltipPopup>Tags for this chat</TooltipPopup>
+      <TooltipPopup>
+        <T>Tags for this chat</T>
+      </TooltipPopup>
     </Tooltip>
   );
 }
