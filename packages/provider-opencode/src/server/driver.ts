@@ -1,3 +1,4 @@
+import { brokenVersionDetail } from "@t3tools/provider-core/server/compatibility";
 import { resolveProviderProbeTimeoutMs } from "@t3tools/provider-core/server/snapshotProbe";
 import {
   ProviderDriverKind,
@@ -583,6 +584,25 @@ export const OpenCodeDriver: ProviderDriver<
           ...commandInventory,
         })),
       );
+    const inventoryForServer = Effect.fn("OpenCodeDriver.inventoryForServer")(function* (
+      server: Pick<OpenCodeRuntime.OpenCodeServerConnection, "url" | "version" | "serverPassword">,
+      cwd: string,
+    ) {
+      const detail = brokenVersionDetail({
+        name: "OpenCode",
+        version: server.version,
+        advisory: yield* host.compatibility(DRIVER_KIND, server.version),
+      });
+      if (detail !== undefined)
+        return yield* new ProviderDriverError({ driver: DRIVER_KIND, instanceId, detail });
+      return yield* loadWorkspaceInventory(
+        openCodeRuntime.createOpenCodeSdkClient({
+          baseUrl: server.url,
+          directory: cwd,
+          ...(server.serverPassword !== undefined ? { serverPassword: server.serverPassword } : {}),
+        }),
+      );
+    });
     const loadWorkspaceForCwd = (cwd: string) =>
       effectiveConfig.serverUrl.trim().length > 0
         ? Effect.scoped(
@@ -596,27 +616,10 @@ export const OpenCodeDriver: ProviderDriver<
                   : {}),
                 environment: processEnv,
               });
-              const client = openCodeRuntime.createOpenCodeSdkClient({
-                baseUrl: server.url,
-                directory: cwd,
-                ...(effectiveConfig.serverPassword
-                  ? { serverPassword: effectiveConfig.serverPassword }
-                  : {}),
-              });
-              return yield* loadWorkspaceInventory(client);
+              return yield* inventoryForServer(server, cwd);
             }),
           )
-        : serverOwner.withServer((server) =>
-            loadWorkspaceInventory(
-              openCodeRuntime.createOpenCodeSdkClient({
-                baseUrl: server.url,
-                directory: cwd,
-                ...(server.serverPassword !== undefined
-                  ? { serverPassword: server.serverPassword }
-                  : {}),
-              }),
-            ),
-          );
+        : serverOwner.withServer((server) => inventoryForServer(server, cwd));
 
     const serverUrl = effectiveConfig.serverUrl.trim();
     const afterUpdate =

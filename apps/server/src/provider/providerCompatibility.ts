@@ -11,7 +11,7 @@ import { brokenVersionDetail } from "@t3tools/provider-core/server/compatibility
 import { satisfiesSemverRange } from "@t3tools/shared/semver";
 import * as Schema from "effect/Schema";
 
-// Manifest ranges follow the upstream server version, independent of D5's release numbering.
+// On each nightly merge, copy its apps/server/package.json version here for upstream manifest ranges.
 const UPSTREAM_SERVER_VERSION = "0.1.11";
 
 const StableVersion = TrimmedNonEmptyString.pipe(

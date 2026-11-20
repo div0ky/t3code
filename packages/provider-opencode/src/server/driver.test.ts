@@ -44,6 +44,7 @@ import {
   OPENCODE_2_WORKSPACE_RESPONSES,
   replayOpenCodeServer,
 } from "./probeResponses.fixture.ts";
+import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
 import * as TestProviderHost from "@t3tools/provider-testing/TestProviderHost";
 
 it("only probes a locally configured OpenCode server's installed CLI", () => {
@@ -1376,6 +1377,24 @@ const openCode1Runtime = {
 it.layer(Layer.mergeAll(layer, Layer.succeed(OpenCodeRuntime.OpenCodeRuntime, openCode1Runtime)))(
   "OpenCodeDriver on OpenCode 1",
   (it) => {
+    it.effect("rejects workspace discovery on a server the compatibility policy rates broken", () =>
+      Effect.gen(function* () {
+        const instance = yield* create({}, noHttp);
+        const error = yield* instance.snapshotForCwd!(openCode1Project).pipe(Effect.flip);
+        assert.include(JSON.stringify(error), "OpenCode 1.18.18 does not work");
+      }).pipe(
+        Effect.updateService(ProviderHost.ProviderHost, (host) => ({
+          ...host,
+          compatibility: () =>
+            Effect.succeed({
+              status: "broken" as const,
+              message: null,
+              recommendedVersion: null,
+              recommendedRange: ">=2.0.18",
+            }),
+        })),
+      ),
+    );
     it.effect("lists a project's own opencode.jsonc models in that project's snapshot", () =>
       Effect.gen(function* () {
         const instance = yield* create({}, noHttp);
