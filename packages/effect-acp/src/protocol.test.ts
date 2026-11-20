@@ -1065,6 +1065,8 @@ it.layer(NodeServices.layer)("effect-acp protocol", (it) => {
       const releaseFailure = yield* Deferred.make<void>();
       const failures = yield* Queue.unbounded<string>();
       const terminated = yield* Deferred.make<AcpError.AcpError>();
+      const classifying = yield* Deferred.make<void>();
+      const finishClassification = yield* Deferred.make<void>();
       const processExit =
         failure === "child" ? new AcpError.AcpProcessExitedError({ signal: "SIGABRT" }) : undefined;
       const stdio = Stdio.make({
@@ -1081,7 +1083,14 @@ it.layer(NodeServices.layer)("effect-acp protocol", (it) => {
       });
       const transport = yield* AcpProtocol.makeAcpPatchedProtocol({
         stdio,
-        ...(processExit === undefined ? {} : { terminationError: Effect.succeed(processExit) }),
+        ...(processExit === undefined
+          ? {}
+          : {
+              terminationError: Deferred.succeed(classifying, undefined).pipe(
+                Effect.andThen(Deferred.await(finishClassification)),
+                Effect.as(processExit),
+              ),
+            }),
         serverRequestMethods: new Set(),
         onOutgoingResponseFailure: (requestId) => Queue.offer(failures, requestId),
         onTermination: (error) => Deferred.succeed(terminated, error).pipe(Effect.asVoid),
@@ -1100,6 +1109,14 @@ it.layer(NodeServices.layer)("effect-acp protocol", (it) => {
       assert.isUndefined(current.pollUnsafe());
       assert.isUndefined(queued.pollUnsafe());
       yield* Deferred.succeed(releaseFailure, undefined);
+      if (processExit !== undefined) {
+        yield* Deferred.await(classifying);
+        const cancel = yield* transport
+          .notify("session/cancel", { sessionId: "session-1" })
+          .pipe(Effect.flip, Effect.forkScoped({ startImmediately: true }));
+        yield* Deferred.succeed(finishClassification, undefined);
+        assert.strictEqual(yield* Fiber.join(cancel), processExit);
+      }
       const error = yield* Deferred.await(terminated);
       if (processExit === undefined) assert.instanceOf(error, AcpError.AcpTransportError);
       else assert.strictEqual(error, processExit);

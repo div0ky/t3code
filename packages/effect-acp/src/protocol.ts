@@ -355,10 +355,14 @@ export const makeAcpPatchedProtocol = Effect.fn("makeAcpPatchedProtocol")(functi
   );
   const failClosedOutgoing = (detail: string) =>
     Ref.get(outgoingWriterState).pipe(
-      Effect.flatMap(
-        ({ terminalError }) =>
-          terminalError ?? new AcpError.AcpTransportError({ detail, cause: "Output queue closed" }),
-      ),
+      Effect.flatMap(({ terminalError, intentionalEnd }) => {
+        if (terminalError !== undefined) return Effect.fail(terminalError);
+        if (intentionalEnd)
+          return Effect.fail(
+            new AcpError.AcpTransportError({ detail, cause: "Output queue closed" }),
+          );
+        return Deferred.await(terminationFailure);
+      }),
     );
 
   const logProtocol = (event: AcpProtocolLogEvent) => {
@@ -919,7 +923,8 @@ export const makeAcpPatchedProtocol = Effect.fn("makeAcpPatchedProtocol")(functi
       Effect.asVoid,
     );
   const terminateOutgoingWriter = (fallback: AcpError.AcpError) =>
-    classifyProcessTermination(fallback).pipe(
+    Queue.end(outgoing).pipe(
+      Effect.andThen(classifyProcessTermination(fallback)),
       Effect.flatMap((error) =>
         failOutgoingWrites(error).pipe(
           Effect.andThen(handleTermination(() => Effect.succeed(error))),
