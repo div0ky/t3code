@@ -29,6 +29,7 @@ import * as Effect from "effect/Effect";
 import * as Deferred from "effect/Deferred";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
 import * as Tracer from "effect/Tracer";
 import * as TestClock from "effect/testing/TestClock";
@@ -167,7 +168,7 @@ const layerTest = Layer.mergeAll(
 
 // ProviderContinuationService consumes the orchestrator's continuation queue, as in production.
 const layerContinuationWorkerTest = ProviderContinuationService.layer.pipe(
-  Layer.provide(Layer.merge(ProviderContinuationRequests.layer, IdAllocator.layer)),
+  Layer.provideMerge(Layer.merge(ProviderContinuationRequests.layer, IdAllocator.layer)),
   Layer.provideMerge(layerTest),
 );
 
@@ -1964,7 +1965,194 @@ it.layer(layerContinuationWorkerTest)("interrupted completion wakes", (it) => {
     }),
   );
 
-  it.effect("settling with a queued completion wake disposes its running siblings", () =>
+  it.effect("late terminal results stay recorded after the user settles a delegated tree", () =>
+    Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const requests = yield* ProviderContinuationRequests.ProviderContinuationRequests;
+      const now = yield* DateTime.now;
+      const threadId = ThreadId.make("late-result-parent");
+      const projectId = ProjectId.make("late-result-project");
+      const runId = RunId.make("late-result-origin");
+      const rootNodeId = NodeId.make("late-result-root");
+      yield* seedParentWithTerminalTask({
+        threadId,
+        projectId,
+        runId,
+        rootNodeId,
+        now,
+        taskId: NodeId.make("late-result-observed"),
+        deliveryState: "acknowledged",
+        parentRunStatus: "completed",
+      });
+      // Reconciled terminals are persisted first and reported separately by recovery.
+      const child = yield* seedRestartCancelledChild({
+        parentThreadId: threadId,
+        parentRunId: runId,
+        projectId,
+        rootNodeId,
+        now,
+        name: "late-result-child",
+        completionWake: "always",
+        continuationPending: false,
+        runStatus: "completed",
+      });
+      const grandchild = yield* seedRestartCancelledChild({
+        parentThreadId: child.childThreadId,
+        parentRunId: child.childRunId,
+        projectId,
+        now,
+        rootNodeId: NodeId.make("late-result-child-root"),
+        name: "late-result-grandchild",
+        completionWake: "always",
+        continuationPending: false,
+        runStatus: "completed",
+      });
+      const sink = yield* EventSink.EventSinkV2;
+      const provider = (yield* orchestrator.getThreadProjection(threadId)).providerThreads[0]!;
+      const nestedRun = (yield* orchestrator.getThreadProjection(child.childThreadId)).runs[0]!;
+      const nestedProviderId = parentProviderThreadId(child.childThreadId);
+      yield* sink.write({
+        commandId: reconcileCommandId("late-result-nested-provider"),
+        events: [
+          {
+            id: EventId.make("late-result-nested-provider"),
+            type: "provider-thread.updated",
+            threadId: child.childThreadId,
+            occurredAt: now,
+            payload: { ...provider, id: nestedProviderId, appThreadId: child.childThreadId },
+          },
+          {
+            id: EventId.make("late-result-nested-run"),
+            type: "run.updated",
+            threadId: child.childThreadId,
+            runId: nestedRun.id,
+            occurredAt: now,
+            payload: { ...nestedRun, providerThreadId: nestedProviderId },
+          },
+        ],
+      });
+      yield* orchestrator.dispatch({
+        type: "thread.settle",
+        commandId: CommandId.make("late-result-settle"),
+        threadId,
+      });
+      yield* orchestrator.recoverDelegatedTask(grandchild.childThreadId);
+      yield* orchestrator.recoverDelegatedTask(child.childThreadId);
+      for (const [owner, result] of [
+        [child.childThreadId, grandchild],
+        [threadId, child],
+      ] as const) {
+        // Wait for the continuation worker to finish processing earlier offers for this thread.
+        const drained = yield* Deferred.make<void>();
+        yield* requests.offer({
+          threadId: owner,
+          providerThreadId: parentProviderThreadId(owner),
+          driver,
+          detail: null,
+          dispatchIfCurrent: () =>
+            Deferred.succeed(drained, undefined).pipe(Effect.as(Option.none())),
+        });
+        yield* Deferred.await(drained);
+        const projection = yield* orchestrator.getThreadProjection(owner);
+        const task = projection.subagents.find((row) => row.id === result.taskId)!;
+        assert.equal(task.status, "completed");
+        assert.isString(task.result);
+        assert.isTrue(
+          projection.contextTransfers.some(
+            (transfer) =>
+              transfer.type === "subagent_result" &&
+              transfer.sourceThreadId === result.childThreadId,
+          ),
+        );
+        assert.equal(projection.thread.settledOverride, "settled");
+        assert.lengthOf(projection.runs, 1);
+        assert.equal(task.completionDelivery?.state, "disposed");
+      }
+    }),
+  );
+
+  it.effect("settlement retires a reserved completion even after a manual reopen", () =>
+    Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const threadId = ThreadId.make("reserved-settle-parent");
+      const runId = RunId.make("reserved-settle-origin");
+      const taskId = NodeId.make("reserved-settle-task");
+      yield* seedParentWithTerminalTask({
+        threadId,
+        runId,
+        taskId,
+        projectId: ProjectId.make("reserved-settle-project"),
+        rootNodeId: NodeId.make("reserved-settle-root"),
+        now: yield* DateTime.now,
+        parentRunStatus: "completed",
+        deliveryState: "claimed",
+        deliveryTaskIds: [taskId],
+      });
+      const before = yield* orchestrator.getThreadProjection(threadId);
+      const delivery = before.runs[0]!.delegatedCompletion!.delivery!;
+      const replay = (name: string) =>
+        orchestrator
+          .dispatch({
+            type: "message.dispatch",
+            createdBy: "agent",
+            creationSource: "server",
+            commandId: CommandId.make(name),
+            threadId,
+            messageId: delivery.messageId,
+            text: "Delegated task completed",
+            attachments: [],
+            dispatchMode: { type: "queue_after_active" },
+            delegatedCompletion: {
+              parentRunId: runId,
+              generation: delivery.generation,
+              taskIds: [taskId],
+            },
+          })
+          .pipe(Effect.flip);
+      // Older databases can contain a settled thread with its reservation still open.
+      const sink = yield* EventSink.EventSinkV2;
+      const now = yield* DateTime.now;
+      yield* sink.write({
+        events: [
+          {
+            id: EventId.make("reserved-legacy-settle"),
+            type: "thread.settled",
+            threadId,
+            occurredAt: now,
+            payload: { ...before.thread, settledAt: now, settledOverride: "settled" },
+          },
+        ],
+      });
+      assert.include(
+        String((yield* replay("reserved-legacy-replay")).cause),
+        "no longer dispatchable",
+      );
+      yield* orchestrator.dispatch({
+        type: "thread.settle",
+        commandId: CommandId.make("reserved-settle"),
+        threadId,
+      });
+      yield* orchestrator.dispatch({
+        type: "message.dispatch",
+        createdBy: "user",
+        creationSource: "web",
+        commandId: CommandId.make("reserved-manual"),
+        threadId,
+        messageId: MessageId.make("reserved-manual"),
+        text: "Resume work",
+        attachments: [],
+        dispatchMode: { type: "start_immediately" },
+      });
+      const opened = yield* orchestrator.getThreadProjection(threadId);
+      assert.notEqual(opened.thread.settledOverride, "settled");
+      assert.include(String((yield* replay("reserved-replay")).cause), "no longer dispatchable");
+      const after = yield* orchestrator.getThreadProjection(threadId);
+      assert.isFalse(after.messages.some((message) => message.id === delivery.messageId));
+      assert.isNull(after.runs.find((run) => run.id === runId)?.delegatedCompletion?.delivery);
+    }),
+  );
+
+  it.effect("settling preserves a queued completion wake until its running sibling finishes", () =>
     Effect.gen(function* () {
       const { orchestrator, sink, now, threadId, originRunId, sibling, wake, completeSibling } =
         yield* queueCompletionWakeBesideRunningSibling("sibling-settle");
@@ -1990,6 +2178,29 @@ it.layer(layerContinuationWorkerTest)("interrupted completion wakes", (it) => {
         ],
       });
 
+      const refused = yield* orchestrator
+        .dispatch({
+          type: "thread.settle",
+          commandId: CommandId.make("sibling-settle-while-running"),
+          threadId,
+        })
+        .pipe(Effect.flip);
+      assert.include(String(refused.cause), sibling.childThreadId!);
+      const blocked = yield* orchestrator.getThreadProjection(threadId);
+      assert.equal(blocked.runs.find((run) => run.id === wake.id)?.status, "queued");
+      assert.isNull(blocked.thread.settledAt);
+
+      const afterSequence = yield* completeSibling;
+      yield* sink.stream({ afterSequence, eventType: "subagent.updated" }).pipe(
+        Stream.filter(
+          (stored) =>
+            stored.event.type === "subagent.updated" &&
+            stored.event.payload.id === sibling.id &&
+            stored.event.payload.status === "completed",
+        ),
+        Stream.take(1),
+        Stream.runDrain,
+      );
       const settled = yield* orchestrator.dispatch({
         type: "thread.settle",
         commandId: CommandId.make("sibling-settle-settle"),
@@ -2009,32 +2220,11 @@ it.layer(layerContinuationWorkerTest)("interrupted completion wakes", (it) => {
         "disposed",
       );
 
-      const afterSequence = yield* completeSibling;
-      yield* sink.stream({ afterSequence, eventType: "subagent.updated" }).pipe(
-        Stream.filter(
-          (stored) =>
-            stored.event.type === "subagent.updated" &&
-            stored.event.payload.id === sibling.id &&
-            stored.event.payload.status === "completed",
-        ),
-        Stream.take(1),
-        Stream.runDrain,
-      );
-      const afterLateResult = yield* orchestrator.getThreadProjection(threadId);
       assert.equal(
-        afterLateResult.subagents.find((task) => task.id === sibling.id)?.completionDelivery?.state,
+        afterSettle.runs.find((run) => run.id === originRunId)?.delegatedCompletion?.disposition,
         "disposed",
       );
-      assert.deepEqual(
-        afterLateResult.runs.map((run) => run.id),
-        afterSettle.runs.map((run) => run.id),
-      );
-      assert.equal(
-        afterLateResult.runs.find((run) => run.id === originRunId)?.delegatedCompletion
-          ?.disposition,
-        "disposed",
-      );
-      assert.equal(afterLateResult.thread.settledOverride, "settled");
+      assert.equal(afterSettle.thread.settledOverride, "settled");
     }),
   );
 });

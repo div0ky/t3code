@@ -224,9 +224,11 @@ export class OrchestratorDispatchError extends Schema.TaggedError<OrchestratorDi
     commandId: CommandId,
     commandType: Schema.String,
     cause: Schema.optional(Schema.Defect()),
+    blockedThreadId: Schema.optional(ThreadId),
   },
 ) {
   override get message(): string {
+    if (this.blockedThreadId !== undefined && typeof this.cause === "string") return this.cause;
     return `Failed to dispatch orchestration command ${this.commandType} (${this.commandId}).`;
   }
 }
@@ -1601,6 +1603,9 @@ const nativeSubagentRef = (subagent: OrchestrationV2Subagent): DyingNativeSubage
   providerInstanceId: subagent.providerInstanceId,
 });
 
+const delegationParentClosed = (thread: OrchestrationV2AppThread) =>
+  thread.deletedAt !== null || thread.archivedAt !== null || thread.settledOverride === "settled";
+
 const hasRunningDelegatedTasks = (subagents: ReadonlyArray<OrchestrationV2Subagent>) =>
   subagents.some(
     (task) =>
@@ -1902,7 +1907,11 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       for (const transfer of contextTransfers) {
         if (transfer.type !== "fork" || transfer.sourceThreadId !== threadId) continue;
         const child = yield* projectionStore.findThread(transfer.targetThreadId);
-        if (child?.lineage.sideChat === true && child.deletedAt === null) {
+        if (
+          child?.lineage.sideChat === true &&
+          child.lineage.parentThreadId === threadId &&
+          child.deletedAt === null
+        ) {
           sideChatIds.push(child.id);
         }
       }
@@ -2075,8 +2084,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         cohort?.disposition !== "open" ||
         delivery == null ||
         delivery.taskIds.length === 0 ||
-        controls.thread.archivedAt !== null ||
-        controls.thread.deletedAt !== null
+        delegationParentClosed(controls.thread)
       )
         return;
       const messages = yield* projectionStore.getThreadRecords(threadId, ["messages"], {
@@ -2166,19 +2174,18 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     }
     const threadId = projection.thread.id;
     const parentIsLive = hasLiveRun({ runs: [parentRun] });
-    const pendingTaskIds =
-      projection.thread.archivedAt === null && projection.thread.deletedAt === null
-        ? projection.subagents
-            .filter(
-              (task) =>
-                task.origin === "app_owned" &&
-                task.runId === parentRun.id &&
-                task.completionDelivery?.state === "pending" &&
-                isTerminalDelegatedTaskStatus(task.status) &&
-                (!parentIsLive || task.completionWake === "always"),
-            )
-            .map((task) => task.id)
-        : [];
+    const pendingTaskIds = !delegationParentClosed(projection.thread)
+      ? projection.subagents
+          .filter(
+            (task) =>
+              task.origin === "app_owned" &&
+              task.runId === parentRun.id &&
+              task.completionDelivery?.state === "pending" &&
+              isTerminalDelegatedTaskStatus(task.status) &&
+              (!parentIsLive || task.completionWake === "always"),
+          )
+          .map((task) => task.id)
+      : [];
     const nextDelivery =
       pendingTaskIds.length === 0
         ? null
@@ -3841,21 +3848,30 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
 
   const disposeDelegatedCompletionCohort = Effect.fn(
     "Orchestrator.disposeDelegatedCompletionCohort",
-  )(function* (input: {
-    readonly command: OrchestrationV2ServerCommand;
-    readonly events: Ref.Ref<Array<OrchestrationV2DomainEvent>>;
-    readonly projection: Pick<
-      OrchestrationV2ThreadProjection,
-      "runs" | "subagents" | "messages" | "nodes" | "attempts"
-    >;
-    readonly parentRunId: RunId;
-    readonly disposition: "stopped" | "disposed";
-    readonly now: DateTime.Utc;
-    readonly cancelQueuedDelivery?: boolean;
-    // An interrupted or cancelled wake disposes only the results it carried. The cohort stays
-    // open, and its delivery stays the wake's, so the wake's terminal reserves any sibling's result.
-    readonly interruptedWakeTaskIds?: ReadonlyArray<NodeId>;
-  }) {
+  )(function* (
+    input: {
+      readonly command: OrchestrationV2ServerCommand;
+      readonly events: Ref.Ref<Array<OrchestrationV2DomainEvent>>;
+      readonly parentRunId: RunId;
+      readonly disposition: "stopped" | "disposed";
+      readonly now: DateTime.Utc;
+      // An interrupted or cancelled wake disposes only the results it carried. The cohort stays
+      // open, and its delivery stays the wake's, so the wake's terminal reserves any sibling's result.
+      readonly interruptedWakeTaskIds?: ReadonlyArray<NodeId>;
+    } & (
+      | {
+          readonly cancelQueuedDelivery: false;
+          readonly projection: Pick<OrchestrationV2ThreadProjection, "runs" | "subagents">;
+        }
+      | {
+          readonly cancelQueuedDelivery?: true;
+          readonly projection: Pick<
+            OrchestrationV2ThreadProjection,
+            "runs" | "subagents" | "messages" | "nodes" | "attempts"
+          >;
+        }
+    ),
+  ) {
     const parentRun = input.projection.runs.find((candidate) => candidate.id === input.parentRunId);
     if (parentRun === undefined) {
       return;
@@ -3929,12 +3945,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         },
       });
     }
-    const deliveryRun = completionDeliveryRun(input.projection, cohort?.delivery ?? null);
-    if (
-      keptTaskIds.size === 0 &&
-      input.cancelQueuedDelivery !== false &&
-      deliveryRun?.status === "queued"
-    ) {
+    if (input.cancelQueuedDelivery === false || keptTaskIds.size > 0) return;
+    const deliveryRun = completionDeliveryRun(input.projection, cohort?.delivery);
+    if (deliveryRun?.status === "queued") {
       yield* emitQueuedRunCancellation({
         command: input.command,
         events: input.events,
@@ -3948,18 +3961,18 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
   const disposeAllDelegatedCompletionCohorts = (input: {
     readonly command: OrchestrationV2Command;
     readonly events: Ref.Ref<Array<OrchestrationV2DomainEvent>>;
-    readonly projection: Pick<
-      OrchestrationV2ThreadProjection,
-      "runs" | "subagents" | "messages" | "nodes" | "attempts"
-    >;
+    readonly projection: Pick<OrchestrationV2ThreadProjection, "runs" | "subagents">;
     readonly now: DateTime.Utc;
-    readonly cancelQueuedDelivery?: boolean;
   }) =>
     Effect.forEach(
       Array.from(
         new Set([
           ...input.projection.runs
-            .filter((run) => run.delegatedCompletion !== undefined)
+            .filter((run) =>
+              input.command.type === "thread.settle"
+                ? run.delegatedCompletion?.delivery != null
+                : run.delegatedCompletion !== undefined,
+            )
             .map((run) => run.id),
           ...input.projection.subagents
             .filter((task) => task.origin === "app_owned" && task.runId !== null)
@@ -3969,6 +3982,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       (parentRunId) =>
         disposeDelegatedCompletionCohort({
           ...input,
+          cancelQueuedDelivery: false,
           parentRunId,
           disposition: "disposed",
         }),
@@ -4364,6 +4378,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     >,
     events: Ref.Ref<Array<OrchestrationV2DomainEvent>>,
     effects: Ref.Ref<Array<PendingOrchestrationEffectV2>>,
+    settlingParent?: Extract<OrchestrationV2ServerCommand, { type: "thread.settle" }>,
   ) {
     const thread = yield* projectionStore.getThread(command.threadId).pipe(
       Effect.mapError(
@@ -4374,6 +4389,15 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           }),
       ),
     );
+    if (settlingParent !== undefined) {
+      if (
+        thread.deletedAt !== null ||
+        thread.archivedAt !== null ||
+        thread.settledOverride === "settled"
+      )
+        return;
+      yield* refuseAboveDispatchModeLimit(settlingParent, thread.id, thread);
+    }
     if (thread.deletedAt !== null) {
       return yield* new OrchestratorDispatchError({
         commandId: command.commandId,
@@ -4571,7 +4595,13 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       }
     }
     if (command.type === "thread.settle") {
-      const projection = yield* loadProjectionForCommand(command, ["runs", "runtimeRequests"]);
+      const projection = yield* loadProjectionForCommand(
+        command,
+        ["runs", "runtimeRequests", "subagents"],
+        {
+          omitSettledSubagents: true,
+        },
+      );
       if (
         command.expectedLatestRunId !== undefined &&
         projection.runs.reduce<OrchestrationV2Run | undefined>(
@@ -4629,10 +4659,22 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         return yield* new OrchestratorDispatchError({
           commandId: command.commandId,
           commandType: command.type,
-          cause: `Thread ${command.threadId} ${blocker}`,
+          ...(settlingParent === undefined ? {} : { blockedThreadId: thread.id }),
+          cause:
+            settlingParent === undefined
+              ? `Thread ${thread.id} ${blocker}`
+              : `Cannot settle this thread because delegated thread “${thread.title}” (${thread.id}) ${blocker}`,
         });
       }
 
+      // Retire reservations before cancelling queued runs. A continuation already in flight
+      // must stay stale even if the user reopens the thread before it reaches dispatch.
+      yield* disposeAllDelegatedCompletionCohorts({
+        command,
+        events,
+        now: yield* DateTime.now,
+        projection,
+      });
       for (const request of pendingRequests) {
         yield* dispatchRuntimeRequestRespond(
           {
@@ -4655,7 +4697,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
             runId: run.id,
           },
           events,
-          "cohort",
+          "settlement",
         );
       }
     }
@@ -4738,7 +4780,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     );
     if (
       command.type !== "thread.archive" &&
-      command.type !== "thread.settle" &&
+      (command.type !== "thread.settle" || settlingParent !== undefined) &&
       liveSessions.length > 0
     ) {
       // The provider context holds only the active and target provider threads; a session kept
@@ -4753,8 +4795,11 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           return yield* new OrchestratorDispatchError({
             commandId: command.commandId,
             commandType: command.type,
+            ...(settlingParent === undefined ? {} : { blockedThreadId: thread.id }),
             cause:
-              "The current session is still running background agents or commands, and this change would end them. Wait for them to finish, or press Stop, then try again.",
+              settlingParent === undefined
+                ? "The current session is still running background agents or commands, and this change would end them. Wait for them to finish, or press Stop, then try again."
+                : `Cannot settle this thread because delegated thread “${thread.title}” (${thread.id}) still has background work. Wait for it to finish, or stop it before settling.`,
           });
         }
       }
@@ -5706,7 +5751,6 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         events,
         projection: yield* getProjectionWithPendingEvents(command.threadId, events),
         now,
-        cancelQueuedDelivery: false,
       });
     }
     if (command.type === "thread.archive" || command.type === "thread.settle") {
@@ -7113,6 +7157,36 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           }
         : undefined,
     );
+    // Check the persisted lifecycle before message intake clears a settlement for a new turn.
+    if (command.delegatedCompletion !== undefined && delegationParentClosed(projection.thread)) {
+      return yield* new OrchestratorDispatchError({
+        commandId: command.commandId,
+        commandType: command.type,
+        cause: "Delegated completion delivery is no longer dispatchable.",
+      });
+    }
+    if (projection.thread.deletedAt !== null) {
+      return yield* new OrchestratorDispatchError({
+        commandId: command.commandId,
+        commandType: command.type,
+        cause: `Thread ${command.threadId} is deleted.`,
+      });
+    }
+    if (
+      command.createdBy === "agent" &&
+      command.senderThreadId !== undefined &&
+      projection.thread.lineage.relationshipToParent === "subagent" &&
+      command.senderThreadId === projection.thread.lineage.parentThreadId
+    ) {
+      const parent = yield* findThread(command.senderThreadId);
+      if (parent === null || delegationParentClosed(parent)) {
+        return yield* new OrchestratorDispatchError({
+          commandId: command.commandId,
+          commandType: command.type,
+          cause: `Parent thread ${command.senderThreadId} is no longer active.`,
+        });
+      }
+    }
     if (command.steerFollowUpOfRunId !== undefined) {
       const source = projection.runs.find((run) => run.id === command.steerFollowUpOfRunId);
       if (
@@ -9820,13 +9894,16 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         (candidate) => candidate.id === command.parentRunId,
       );
       if (
+        delegationParentClosed(parentProjection.thread) ||
         parentRun === undefined ||
         !(isActiveRun(parentRun) || (yield* backgroundSubagentOutlivesRun(parentRun)))
       ) {
         return yield* new OrchestratorDispatchError({
           commandId: command.commandId,
           commandType: command.type,
-          cause: `Parent run ${command.parentRunId} is not active.`,
+          cause: delegationParentClosed(parentProjection.thread)
+            ? "The parent thread is settled, archived, or deleted and cannot delegate work."
+            : `Parent run ${command.parentRunId} is not active.`,
         });
       }
       if (yield* stopReachedRun(command, command.parentThreadId, parentRun.id)) {
@@ -10137,6 +10214,8 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         ],
       })
       .pipe(mapDispatchError(command));
+    // A user can reopen the child independently of its settled parent.
+    if (delegationParentClosed(parent.thread)) return;
     const original = parent.subagents.find(
       (task) =>
         task.origin === "app_owned" &&
@@ -10303,6 +10382,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         task.remoteChild.threadId === command.remoteChild.threadId,
     );
     if (
+      delegationParentClosed(parentProjection.thread) ||
       parentRun === undefined ||
       (followsUp
         ? parentRun.id !== followUpOwnerRun(parentProjection.runs)?.id
@@ -10312,7 +10392,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       return yield* new OrchestratorDispatchError({
         commandId: command.commandId,
         commandType: command.type,
-        cause: `Parent run ${command.parentRunId} is not active.`,
+        cause: delegationParentClosed(parentProjection.thread)
+          ? "The parent thread is settled, archived, or deleted and cannot delegate work."
+          : `Parent run ${command.parentRunId} is not active.`,
       });
     }
     if (yield* stopReachedRun(command, command.parentThreadId, parentRun.id)) {
@@ -12048,8 +12130,8 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
   const dispatchQueuedRunCancel = Effect.fn("Orchestrator.dispatchQueuedRunCancel")(function* (
     command: Extract<OrchestrationV2Command, { readonly type: "queued-run.cancel" }>,
     events: Ref.Ref<Array<OrchestrationV2DomainEvent>>,
-    // Settling disposes a cancelled wake's whole cohort, so a sibling's late result cannot unsettle it.
-    disposes: "wake" | "cohort" = "wake",
+    // Settlement has already disposed every outstanding delivery under this thread's lock.
+    reason: "cancel" | "settlement" = "cancel",
   ) {
     const projection = yield* loadProjectionForCommand(
       command,
@@ -12074,7 +12156,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       (candidate) => candidate.id === queuedRun.userMessageId,
     );
     const now = yield* DateTime.now;
-    if (queuedMessage?.delegatedCompletion !== undefined) {
+    if (reason === "cancel" && queuedMessage?.delegatedCompletion !== undefined) {
       yield* disposeDelegatedCompletionCohort({
         command,
         events,
@@ -12083,9 +12165,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         disposition: "disposed",
         now,
         cancelQueuedDelivery: false,
-        ...(disposes === "wake"
-          ? { interruptedWakeTaskIds: queuedMessage.delegatedCompletion.taskIds }
-          : {}),
+        interruptedWakeTaskIds: queuedMessage.delegatedCompletion.taskIds,
       });
     }
     yield* emitQueuedRunCancellation({ command, events, projection, run: queuedRun, now });
@@ -14563,8 +14643,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     const cohort = input.parentRun?.delegatedCompletion;
     if (
       input.parentRun === undefined ||
-      input.parentProjection.thread.archivedAt !== null ||
-      input.parentProjection.thread.deletedAt !== null ||
+      delegationParentClosed(input.parentProjection.thread) ||
       (cohort !== undefined && cohort.disposition !== "open")
     ) {
       return {
@@ -15307,8 +15386,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       .map((task) => task.id);
     const canReserveFollowUp =
       cohort.disposition === "open" &&
-      projection.thread.archivedAt === null &&
-      projection.thread.deletedAt === null &&
+      !delegationParentClosed(projection.thread) &&
       pendingTaskIds.length > 0;
     const nextDelivery = canReserveFollowUp
       ? {
@@ -15417,7 +15495,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
 
   const dispatchOnce = Effect.fn("orchestrationV2.dispatch.once")(function* (
     command: OrchestrationV2ServerCommand,
-    sideChatIds: ReadonlyArray<ThreadId>,
+    cascadeIds: ReadonlyArray<ThreadId>,
   ): Effect.fn.Return<
     {
       readonly events: ReadonlyArray<OrchestrationV2DomainEvent>;
@@ -15470,8 +15548,16 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
               (cause) => new OrchestratorProjectionError({ threadId: command.threadId, cause }),
             ),
           );
+        const parent =
+          thread.lineage.relationshipToParent === "subagent" &&
+          thread.lineage.parentThreadId !== null
+            ? yield* findThread(thread.lineage.parentThreadId)
+            : null;
         if (
+          (parent !== null && !delegationParentClosed(parent)) ||
           thread.settledOverride !== null ||
+          thread.pinnedAt != null ||
+          thread.autoSettleDisabledAt != null ||
           thread.urgentAt != null ||
           DateTime.toEpochMillis(thread.updatedAt) > DateTime.toEpochMillis(command.snapshotAt)
         ) {
@@ -15512,6 +15598,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
                 (cause) => new OrchestratorProjectionError({ threadId: deletion.threadId, cause }),
               ),
             );
+          if (deletion.threadId !== command.threadId) {
+            yield* refuseAboveDispatchModeLimit(command, deletion.threadId, projection.thread);
+          }
           return yield* mapDispatchError(command)(
             planThreadDeletion({
               command: deletion,
@@ -15537,13 +15626,13 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
             return { events: [], effects: [] };
           }
         }
-        // The dispatch wrapper holds each side chat's lock, so none can commit after this plan.
+        // All descendants stay locked until their cleanup and the parent deletion commit.
         const plans = [
           yield* planDeletion(command),
-          ...(yield* Effect.forEach(sideChatIds, (threadId) =>
+          ...(yield* Effect.forEach(cascadeIds, (threadId) =>
             planDeletion({
               ...command,
-              commandId: CommandId.make(`${command.commandId}:side-chat:${threadId}`),
+              commandId: CommandId.make(`${command.commandId}:child:${threadId}`),
               threadId,
             }),
           )),
@@ -15558,7 +15647,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         const parentArchivedAt = (yield* findThread(command.threadId))?.archivedAt ?? null;
         yield* dispatchThreadMutation(command, events, effects);
         // Unarchive restores the side chats this parent's archive took, not ones archived before it.
-        for (const threadId of sideChatIds) {
+        for (const threadId of cascadeIds) {
           const sideChatArchivedAt = (yield* findThread(threadId))?.archivedAt ?? null;
           const follows =
             command.type === "thread.archive"
@@ -15588,6 +15677,21 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         break;
       }
       case "thread.settle":
+        yield* dispatchThreadMutation(command, events, effects);
+        for (const threadId of cascadeIds) {
+          yield* dispatchThreadMutation(
+            {
+              type: command.type,
+              commandId: CommandId.make(`${command.commandId}:child:${threadId}`),
+              threadId,
+              settledAt: command.settledAt,
+            },
+            events,
+            effects,
+            command,
+          );
+        }
+        break;
       case "thread.unsettle":
       case "thread.snooze":
       case "thread.unsnooze":
@@ -15932,10 +16036,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     } satisfies OrchestratorV2DispatchResult;
   });
 
-  /** `sideChatIds` are the live side chats a delete, archive, or unarchive cascades to, read under their locks. */
   const dispatchWithReceiptEffect = Effect.fn("orchestrationV2.dispatch.withReceipt")(function* (
     command: OrchestrationV2ServerCommand,
-    sideChatIds: ReadonlyArray<ThreadId> = [],
+    cascadeIds: ReadonlyArray<ThreadId> = [],
     cancelledTask?: OrchestrationV2Subagent,
   ): Effect.fn.Return<OrchestratorV2DispatchResult, OrchestratorV2Error> {
     yield* Effect.annotateCurrentSpan({
@@ -15989,7 +16092,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       );
     }
 
-    const plan = yield* dispatchOnce(command, sideChatIds).pipe(
+    const plan = yield* dispatchOnce(command, cascadeIds).pipe(
       Effect.tap((planned) => refuseAboveRuntimeModeCeiling(command, planned.events)),
       Effect.filterOrFail(
         (planned) =>
@@ -16018,7 +16121,12 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           // Refusals depend on modes the user can change; a recorded rejection would block the retry.
           if (
             cause._tag === "OrchestratorThreadAboveModeLimitError" ||
-            cause._tag === "OrchestratorRuntimeModeAboveCeilingError"
+            cause._tag === "OrchestratorRuntimeModeAboveCeilingError" ||
+            // A deferred settle retries when the descendant changes, even if the parent hasn't.
+            (command.type === "thread.settle" &&
+              command.expectedLatestRunId !== undefined &&
+              cause._tag === "OrchestratorDispatchError" &&
+              cause.blockedThreadId !== undefined)
           ) {
             return yield* cause;
           }
@@ -16224,6 +16332,48 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       ),
     );
 
+  const dispatchOwnedTree = Effect.fn("Orchestrator.dispatchOwnedTree")(function* (
+    command: Extract<OrchestrationV2ServerCommand, { type: "thread.settle" | "thread.delete" }>,
+  ) {
+    const seen = new Set<ThreadId>([command.threadId]);
+    const descendants: Array<ThreadId> = [];
+    // Discover each generation under its parents' locks so a concurrent delegation joins the plan.
+    const visit = Effect.fnUntraced(function* (
+      parents: ReadonlyArray<ThreadId>,
+    ): Effect.fn.Return<OrchestratorV2DispatchResult, OrchestratorV2Error> {
+      const children: Array<ThreadId> = [];
+      for (const parentId of parents) {
+        const delegated = yield* projectionStore
+          .listAppOwnedChildThreadIds(parentId)
+          .pipe(mapDispatchError(command));
+        for (const id of delegated) {
+          if (seen.has(id)) continue;
+          const child = yield* findThread(id);
+          if (
+            child?.lineage.parentThreadId !== parentId ||
+            child.lineage.relationshipToParent !== "subagent"
+          )
+            continue;
+          seen.add(id);
+          children.push(id);
+          if (child.deletedAt === null) descendants.push(id);
+        }
+        if (command.type === "thread.delete" && parentId === command.threadId) {
+          for (const id of yield* liveSideChatIds(parentId)) {
+            if (seen.has(id)) continue;
+            seen.add(id);
+            children.push(id);
+            descendants.push(id);
+          }
+        }
+      }
+      return yield* children.length === 0
+        ? dispatchWithReceiptEffect(command, descendants)
+        : children.reduceRight((next, id) => threadDispatch.withLock(id, next), visit(children));
+    });
+    return yield* threadDispatch.withLock(command.threadId, visit([command.threadId]));
+  });
+
   // dispatchWithReceiptEffect owns the dispatch span; this wrapper selects the thread locks.
   const dispatchWithReceipt = Effect.fnUntraced(function* (command: OrchestrationV2ServerCommand) {
     const dispatch = threadDispatch.withLock(
@@ -16244,12 +16394,21 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         ? dispatch
         : threadDispatch.withLock(command.sourceThreadId, dispatch);
     }
-    if (
-      command.type === "thread.delete" ||
-      command.type === "thread.archive" ||
-      command.type === "thread.unarchive"
-    ) {
-      const cascade = threadDispatch.withLock(
+    if (command.type === "thread.delete") {
+      return yield* threadDispatch.withDeletionLock(dispatchOwnedTree(command));
+    }
+    if (command.type === "thread.settle") return yield* dispatchOwnedTree(command);
+    if (command.type === "thread.auto-settle") {
+      // Lineage is immutable. Hold the parent through the candidate recheck and child commit.
+      const child = yield* findThread(command.threadId);
+      const parentId =
+        child?.lineage.relationshipToParent === "subagent" ? child.lineage.parentThreadId : null;
+      return yield* parentId !== null && parentId !== command.threadId
+        ? threadDispatch.withLock(parentId, dispatch)
+        : dispatch;
+    }
+    if (command.type === "thread.archive" || command.type === "thread.unarchive") {
+      return yield* threadDispatch.withLock(
         command.threadId,
         liveSideChatIds(command.threadId).pipe(
           Effect.flatMap((sideChatIds) =>
@@ -16260,9 +16419,6 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           ),
         ),
       );
-      return yield* command.type === "thread.delete"
-        ? threadDispatch.withDeletionLock(cascade)
-        : cascade;
     }
     // Taken before the lineage read, so a message whose read yields keeps its
     // place ahead of later messages to the same thread.

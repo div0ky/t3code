@@ -354,13 +354,16 @@ it.layer(layerTest)("a delegated task in a linked environment", (it) => {
     }),
   );
 
-  it.effect("wakes its parent with the result when it completes there", () =>
+  it.effect.each([
+    { name: "wakes an active parent", settled: false },
+    { name: "keeps an explicitly settled parent closed", settled: true },
+  ])("records the remote result and $name", ({ name, settled }) =>
     Effect.gen(function* () {
       const orchestrator = yield* Orchestrator.OrchestratorV2;
-      const parent = yield* seedLiveParent("completes");
+      const parent = yield* seedLiveParent(name);
       const recorded = yield* orchestrator.dispatch({
         type: "delegated_task.remote.request",
-        commandId: CommandId.make("command:remote-delegate:completes"),
+        commandId: CommandId.make(`command:remote-delegate:${name}`),
         parentThreadId: parent.threadId,
         parentRunId: parent.runId,
         parentNodeId: parent.rootNodeId,
@@ -382,12 +385,34 @@ it.layer(layerTest)("a delegated task in a linked environment", (it) => {
         Effect.map((open) => open.filter((task) => task.parentThreadId === parent.threadId)),
       );
       assert.deepEqual(yield* openFor, [{ parentThreadId: parent.threadId, taskId: taskId! }]);
+      if (settled) {
+        const now = yield* DateTime.now;
+        const run = (yield* orchestrator.getThreadProjection(parent.threadId)).runs[0]!;
+        const sink = yield* EventSink.EventSinkV2;
+        yield* sink.write({
+          events: [
+            {
+              id: EventId.make("remote-settled-parent-finished"),
+              type: "run.updated",
+              threadId: parent.threadId,
+              runId: parent.runId,
+              occurredAt: now,
+              payload: { ...run, status: "completed", completedAt: now },
+            },
+          ],
+        });
+        yield* orchestrator.dispatch({
+          type: "thread.settle",
+          commandId: CommandId.make("remote-settled-parent"),
+          threadId: parent.threadId,
+        });
+      }
       const offers = yield* Offers;
       yield* Ref.set(offers, []);
       const complete = (result: string) =>
         orchestrator.dispatch({
           type: "delegated_task.remote.complete",
-          commandId: CommandId.make(`command:remote-complete:${result}`),
+          commandId: CommandId.make(`command:remote-complete:${name}:${result}`),
           parentThreadId: parent.threadId,
           taskId: taskId!,
           status: "completed",
@@ -403,21 +428,21 @@ it.layer(layerTest)("a delegated task in a linked environment", (it) => {
       const task = projection.subagents.find((candidate) => candidate.id === taskId);
       assert.equal(task?.status, "completed");
       assert.equal(task?.result, "All 412 tests pass on the box.");
-      // The live parent run claimed it, so task_status acknowledges it as for a local child.
-      assert.equal(task?.completionDelivery?.state, "claimed");
+      assert.equal(task?.completionDelivery?.state, settled ? "disposed" : "claimed");
       // Nothing is left for the follower to pick up after a restart.
       assert.deepEqual(yield* openFor, []);
       const item = projection.turnItems.find(
         (candidate) => candidate.type === "subagent" && candidate.subagentId === taskId,
       );
       assert.equal(item?.status, "completed");
-      // The parent's live run is offered the delivery, as for a local child.
       const delivery = projection.runs.find((run) => run.id === parent.runId)?.delegatedCompletion
         ?.delivery;
-      assert.deepEqual(delivery?.taskIds, [taskId]);
+      assert.deepEqual(delivery?.taskIds, settled ? undefined : [taskId]);
       const offered = yield* Ref.get(offers);
-      assert.equal(offered.length, 1);
-      assert.equal(offered[0]?.threadId, parent.threadId);
+      assert.deepEqual(
+        offered.map((request) => request.threadId),
+        settled ? [] : [parent.threadId],
+      );
     }),
   );
 });

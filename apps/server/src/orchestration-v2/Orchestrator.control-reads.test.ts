@@ -1,8 +1,9 @@
 import * as NodeSqlite from "node:sqlite";
 
-import { assert, it } from "@effect/vitest";
+import { assert, it, vi } from "@effect/vitest";
 import {
   CommandId,
+  EnvironmentId,
   MessageId,
   EventId,
   NodeId,
@@ -41,6 +42,8 @@ import {
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import { CodexProviderCapabilitiesV2 } from "./Adapters/CodexAdapterV2.ts";
 import * as DelegatedTaskQuestionReactor from "./DelegatedTaskQuestionReactor.ts";
+import { DispatchModeLimit } from "./DispatchModeLimit.ts";
+import * as ThreadCommandExecutor from "./ThreadCommandExecutor.ts";
 import * as EffectOutbox from "./EffectOutbox.ts";
 import * as EventSink from "./EventSink.ts";
 import * as Orchestrator from "./Orchestrator.ts";
@@ -1228,6 +1231,306 @@ it.effect("settles only the stopped run's background work, once", () =>
       `${commandItem(3)}:running`,
     ]);
   }).pipe(Effect.provide(layerTest)),
+);
+
+const lifecycleTree = Effect.gen(function* () {
+  const orchestrator = yield* Orchestrator.OrchestratorV2;
+  const store = yield* ProjectionStore.ProjectionStoreV2;
+  const parent = ThreadId.make("lifecycle-parent");
+  const fork = ThreadId.make("independent-fork");
+  const sideChat = ThreadId.make("lifecycle-side-chat");
+  yield* orchestrator.dispatch({
+    type: "thread.create",
+    commandId: CommandId.make("create-parent"),
+    threadId: parent,
+    projectId: ProjectId.make("project:lifecycle"),
+    title: "Parent",
+    modelSelection,
+    runtimeMode: "approval-required",
+    interactionMode: "default",
+    createdBy: "user",
+    creationSource: "web",
+    branch: null,
+    worktreePath: null,
+  });
+  const forkFromParent = (targetThreadId: ThreadId, runId?: RunId) =>
+    orchestrator.dispatch({
+      type: "thread.fork",
+      commandId: CommandId.make(`fork:${targetThreadId}`),
+      sourceThreadId: parent,
+      targetThreadId,
+      sideChat: runId === undefined,
+      sourcePoint: runId === undefined ? { type: "latest_stable" } : { type: "run", runId },
+      createdBy: "user",
+      creationSource: "web",
+    });
+  yield* forkFromParent(sideChat);
+  const send = (threadId: ThreadId, senderThreadId?: ThreadId) =>
+    orchestrator.dispatch({
+      type: "message.dispatch",
+      commandId: CommandId.make(`send:${threadId}`),
+      threadId,
+      messageId: MessageId.make(`message:${threadId}`),
+      text: "Start work",
+      senderThreadId,
+      attachments: [],
+      dispatchMode: { type: "start_immediately" },
+      createdBy: senderThreadId === undefined ? "user" : "agent",
+      creationSource: senderThreadId === undefined ? "web" : "mcp",
+    });
+  yield* send(parent);
+  const delegate = Effect.fnUntraced(function* (parentThreadId: ThreadId, elevated = false) {
+    const [run] = (yield* store.getThreadRecords(parentThreadId, ["runs"])).runs;
+    const result = yield* orchestrator.dispatch({
+      type: "delegated_task.request",
+      commandId: CommandId.make(`delegate:${parentThreadId}`),
+      parentThreadId,
+      parentRunId: run!.id,
+      parentNodeId: run!.rootNodeId!,
+      task: "Test the cascade",
+      modelSelection,
+      runtimeMode: elevated ? "full-access" : "approval-required",
+      interactionMode: "default",
+      createdBy: "agent",
+      creationSource: "mcp",
+    });
+    return result.storedEvents.find(({ event }) => event.type === "thread.created")!.event.threadId;
+  });
+  const child = yield* delegate(parent);
+  const complete = Effect.fnUntraced(function* (threadId: ThreadId) {
+    const [run] = (yield* store.getThreadRecords(threadId, ["runs"])).runs;
+    const now = yield* DateTime.now;
+    yield* store.apply({
+      id: EventId.make(`completed:${threadId}`),
+      type: "run.updated",
+      threadId,
+      runId: run!.id,
+      occurredAt: now,
+      payload: { ...run!, status: "completed", completedAt: now },
+    });
+    return run!.id;
+  });
+  return {
+    orchestrator,
+    store,
+    parent,
+    child,
+    sideChat,
+    fork,
+    send,
+    complete,
+    delegate,
+    forkFromParent,
+  };
+});
+
+it.effect.each(["thread.settle", "thread.delete"] as const)(
+  "%s cascades atomically through local delegated threads",
+  (type) =>
+    Effect.gen(function* () {
+      const {
+        orchestrator,
+        store,
+        parent,
+        child,
+        sideChat,
+        fork,
+        send,
+        complete,
+        delegate,
+        forkFromParent,
+      } = yield* lifecycleTree;
+      const grandchild = yield* delegate(child, true);
+      const parentRunId = yield* complete(parent);
+      yield* complete(child);
+      yield* forkFromParent(fork, parentRunId);
+      const [task] = (yield* store.getThreadRecords(parent, ["subagents"])).subagents;
+      const now = yield* DateTime.now;
+      yield* store.apply({
+        type: "subagent.updated",
+        id: EventId.make("remote-task"),
+        threadId: parent,
+        occurredAt: now,
+        payload: {
+          ...task!,
+          id: NodeId.make("remote-task"),
+          childThreadId: null,
+          remoteChild: { environmentId: EnvironmentId.make("peer"), threadId: fork, label: "Peer" },
+        },
+      });
+      const command = {
+        type,
+        threadId: parent,
+        commandId: CommandId.make(type),
+        ...(type === "thread.settle" ? { expectedLatestRunId: parentRunId } : {}),
+      };
+      if (type === "thread.settle") {
+        const blocked = yield* orchestrator
+          .dispatch({ ...command, commandId: CommandId.make("blocked-settle") })
+          .pipe(Effect.flip);
+        const title = (yield* store.getThread(grandchild)).title;
+        assert.include(blocked.message, title);
+        assert.include(blocked.message, "is still running");
+        assert.include(String(blocked.cause), grandchild);
+        for (const id of [parent, child, grandchild]) {
+          assert.isNull((yield* store.getThread(id)).settledAt);
+        }
+        yield* complete(grandchild);
+      } else {
+        const unused = yield* orchestrator.dispatch({
+          type,
+          threadId: parent,
+          onlyIfUnused: true,
+          commandId: CommandId.make("close-if-unused"),
+        });
+        assert.isEmpty(unused.storedEvents);
+      }
+      const denied = yield* orchestrator.dispatch(command).pipe(
+        Effect.provideService(DispatchModeLimit, {
+          runtimeMode: "approval-required",
+          interactionMode: "default",
+        }),
+        Effect.flip,
+      );
+      assert.equal(denied._tag, "OrchestratorThreadAboveModeLimitError");
+      for (const id of [parent, child, grandchild]) {
+        const thread = yield* store.getThread(id);
+        assert.isNull(thread.settledAt);
+        assert.isNull(thread.deletedAt);
+      }
+
+      const result = yield* orchestrator.dispatch(command);
+      const eventType = type === "thread.settle" ? "thread.settled" : "thread.deleted";
+      const affected = result.storedEvents
+        .filter(({ event }) => event.type === eventType)
+        .map(({ event }) => event.threadId);
+      assert.sameMembers(
+        affected,
+        type === "thread.settle"
+          ? [parent, child, grandchild]
+          : [parent, child, grandchild, sideChat],
+      );
+      assert.isNull((yield* store.getThread(fork)).deletedAt);
+      assert.isNull((yield* store.getThread(fork)).settledAt);
+      assert.isNull((yield* store.getThread(sideChat)).settledAt);
+      assert.isTrue((yield* orchestrator.dispatch(command)).replayed);
+      if (type === "thread.settle") {
+        const late = yield* send(grandchild, child).pipe(Effect.flip);
+        assert.include(String(late.cause), child);
+        assert.isNotNull((yield* store.getThread(grandchild)).settledAt);
+        yield* orchestrator.dispatch({
+          type: "thread.unsettle",
+          threadId: grandchild,
+          reason: "user",
+          commandId: CommandId.make("reopen-grandchild"),
+        });
+        const again = yield* orchestrator.dispatch({
+          ...command,
+          commandId: CommandId.make("settle-reopened-grandchild"),
+        });
+        assert.sameMembers(
+          again.storedEvents
+            .filter(({ event }) => event.type === "thread.settled")
+            .map(({ event }) => event.threadId),
+          [parent, grandchild],
+        );
+      } else {
+        const [cancelled] = (yield* store.getThreadRecords(grandchild, ["runs"])).runs;
+        assert.equal(cancelled!.status, "cancelled");
+        const effects = yield* SqlClient.SqlClient;
+        const terminal = yield* effects<{ thread_id: string }>`SELECT thread_id
+          FROM orchestration_v2_effect_outbox WHERE effect_type = 'terminal.cleanup'`;
+        assert.sameMembers(
+          terminal.map((row) => row.thread_id),
+          affected,
+        );
+        assert.isTrue(Exit.isFailure(yield* Effect.exit(send(grandchild))));
+      }
+    }).pipe(Effect.provide(layerTest)),
+);
+
+it.effect("rechecks the parent before applying a swept child's automatic settlement", () =>
+  Effect.gen(function* () {
+    const { orchestrator, store, parent, child, complete } = yield* lifecycleTree;
+    yield* complete(parent);
+    yield* complete(child);
+    yield* orchestrator.dispatch({
+      type: "thread.auto-settle",
+      threadId: parent,
+      commandId: CommandId.make("auto-settle-parent"),
+      snapshotAt: (yield* store.getThread(parent)).updatedAt,
+    });
+    const [candidate] = yield* store.getSettlementCandidates(child);
+    assert.isDefined(candidate);
+    yield* orchestrator.dispatch({
+      type: "thread.unsettle",
+      threadId: parent,
+      commandId: CommandId.make("reopen-parent"),
+      reason: "user",
+    });
+    const stale = yield* orchestrator
+      .dispatch({
+        type: "thread.auto-settle",
+        threadId: child,
+        commandId: CommandId.make("auto-settle-stale-child"),
+        snapshotAt: candidate!.updatedAt,
+      })
+      .pipe(Effect.flip);
+    assert.instanceOf(stale, Orchestrator.OrchestratorDispatchError);
+    assert.isNull((yield* store.getThread(child)).settledAt);
+  }).pipe(Effect.provide(layerTest)),
+);
+
+it.effect(
+  "parent deletion includes a grandchild being launched while it waits for the child lock",
+  () =>
+    Effect.gen(function* () {
+      const { orchestrator, parent, child, delegate } = yield* lifecycleTree;
+      const sink = yield* EventSink.EventSinkV2;
+      const executor = yield* ThreadCommandExecutor.ThreadCommandExecutor;
+      const launching = yield* Deferred.make<void>();
+      const release = yield* Deferred.make<void>();
+      const waiting = yield* Deferred.make<void>();
+      const commit = sink.commitCommand;
+      using _commit = vi
+        .spyOn(sink, "commitCommand")
+        .mockImplementation((input) =>
+          input.commandType === "delegated_task.request" && input.threadId === child
+            ? Deferred.succeed(launching, undefined).pipe(
+                Effect.andThen(Deferred.await(release)),
+                Effect.andThen(commit(input)),
+              )
+            : commit(input),
+        );
+      const launch = yield* delegate(child).pipe(Effect.forkChild({ startImmediately: true }));
+      yield* Deferred.await(launching);
+      const withLock = executor.withLock;
+      const observeLock: typeof withLock = (id, work) =>
+        id === child
+          ? Deferred.succeed(waiting, undefined).pipe(Effect.andThen(withLock(id, work)))
+          : withLock(id, work);
+      using _lock = vi.spyOn(executor, "withLock").mockImplementation(observeLock);
+      const deletion = yield* orchestrator
+        .dispatch({
+          type: "thread.delete",
+          commandId: CommandId.make("delete-during-delegation"),
+          threadId: parent,
+        })
+        .pipe(Effect.forkChild({ startImmediately: true }));
+      yield* Effect.raceFirst(
+        Deferred.await(waiting),
+        Fiber.join(deletion).pipe(Effect.andThen(Effect.die("Deletion bypassed the child lock"))),
+      );
+      yield* Deferred.succeed(release, undefined);
+      const grandchild = yield* Fiber.join(launch);
+      const result = yield* Fiber.join(deletion);
+      assert.include(
+        result.storedEvents
+          .filter(({ event }) => event.type === "thread.deleted")
+          .map(({ event }) => event.threadId),
+        grandchild,
+      );
+    }).pipe(Effect.provide(layerTest)),
 );
 
 it.effect("keeps delegated child pull-request links independent of the parent", () =>

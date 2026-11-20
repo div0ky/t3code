@@ -27,7 +27,10 @@ function delegatedCompletionText(taskIds: ReadonlyArray<string>): string {
 }
 
 function currentDelegatedCompletionDelivery(
-  projection: Pick<OrchestrationV2ThreadProjection, "messages" | "runs" | "providerTurns">,
+  projection: Pick<
+    OrchestrationV2ThreadProjection,
+    "thread" | "messages" | "runs" | "providerTurns"
+  >,
   completion: NonNullable<
     ProviderContinuationRequests.ProviderContinuationRequest["delegatedCompletion"]
   >,
@@ -38,6 +41,7 @@ function currentDelegatedCompletionDelivery(
     (message) => message.id === completion.messageId,
   );
   if (
+    projection.thread.settledOverride === "settled" ||
     sourceRun?.delegatedCompletion?.disposition !== "open" ||
     delivery === null ||
     delivery === undefined ||

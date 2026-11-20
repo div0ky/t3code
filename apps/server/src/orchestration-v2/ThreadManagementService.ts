@@ -1,3 +1,4 @@
+import { turnItemUpdateCanEndBackgroundWork } from "@t3tools/shared/orchestrationV2PendingBackgroundWork";
 import type {
   OrchestrationV2SearchThreadInput,
   OrchestrationV2SearchThreadResult,
@@ -1134,9 +1135,14 @@ const make = Effect.gen(function* () {
     const requestedAt = yield* DateTime.now;
     const { run } = yield* waitForThread({ ...input, timeoutMs: SETTLE_AFTER_RUN_WAIT_MS });
     if (run?.status !== "completed") return;
-    const afterSequence = yield* orchestrator.getThreadEventSequence(input.threadId);
+    let afterSequence = yield* orchestrator.getThreadEventSequence(input.threadId);
+    let blockedThreadId: ThreadId | undefined;
     const trySettle = Effect.gen(function* () {
-      const sequence = yield* orchestrator.getThreadEventSequence(input.threadId);
+      blockedThreadId = undefined;
+      const sequence = Math.max(
+        afterSequence,
+        yield* orchestrator.getThreadEventSequence(input.threadId),
+      );
       const records = yield* getProjectThreadRecords(input, ["runs"]);
       // Settling ends every watch; one the agent started after asking to settle must outlive it.
       if (
@@ -1214,24 +1220,73 @@ const make = Effect.gen(function* () {
         Effect.as(true),
         // A notification can start between the projection read and the guarded dispatch.
         Effect.catchTags({
-          OrchestratorDispatchError: () => Effect.succeed(false),
+          OrchestratorDispatchError: (error) => {
+            blockedThreadId = error.blockedThreadId;
+            return Effect.succeed(false);
+          },
           OrchestratorCommandPreviouslyRejectedError: () => Effect.succeed(false),
         }),
       );
     });
-    yield* Stream.fromEffect(trySettle).pipe(
-      Stream.concat(
-        orchestrator
-          .streamStoredEventsFrom({
+    yield* Effect.gen(function* () {
+      while (!(yield* trySettle)) {
+        const parentUpdates = orchestrator.streamStoredEventsFrom({
+          threadId: input.threadId,
+          afterSequence,
+          eventType: "run.updated",
+        });
+        // Replay from before the failed attempt so a child finishing during dispatch is observed.
+        const updates =
+          blockedThreadId === undefined
+            ? parentUpdates
+            : Stream.merge(
+                parentUpdates,
+                orchestrator
+                  .streamStoredEventsFrom({
+                    threadId: blockedThreadId,
+                    afterSequence,
+                  })
+                  .pipe(
+                    Stream.filter(
+                      ({ event }) =>
+                        event.type === "run.updated" ||
+                        event.type === "runtime-request.updated" ||
+                        event.type === "provider-thread.updated" ||
+                        event.type === "provider-session.updated" ||
+                        event.type === "provider-session.detached" ||
+                        event.type === "run.background-work-cancelled" ||
+                        event.type === "subagent.updated" ||
+                        event.type === "thread.deleted" ||
+                        event.type === "thread.archived" ||
+                        event.type === "thread.settled" ||
+                        (event.type === "turn-item.updated" &&
+                          turnItemUpdateCanEndBackgroundWork(event.payload)),
+                    ),
+                  ),
+              );
+        const nextUpdate = Stream.runHead(updates).pipe(Effect.map(Option.map((e) => e.sequence)));
+        // Adapter-only background work can finish without writing a thread event.
+        const next = yield* blockedThreadId === undefined
+          ? nextUpdate
+          : nextUpdate.pipe(
+              Effect.timeoutOrElse({
+                duration: "1 minute",
+                orElse: () => Effect.succeedSome(afterSequence),
+              }),
+            );
+        if (Option.isNone(next)) return;
+        afterSequence = next.value;
+      }
+    }).pipe(
+      Effect.timeoutOrElse({
+        duration: SETTLE_AFTER_RUN_WAIT_MS,
+        orElse: () =>
+          Effect.logWarning("Deferred thread settlement expired", {
             threadId: input.threadId,
-            afterSequence,
-            eventType: "run.updated",
-          })
-          .pipe(Stream.mapEffect(() => trySettle)),
-      ),
-      Stream.filter((done) => done),
-      Stream.runHead,
-      Effect.timeoutOption(Duration.millis(SETTLE_AFTER_RUN_WAIT_MS)),
+            runId: input.runId,
+            blockedThreadId,
+          }),
+      }),
     );
   });
 

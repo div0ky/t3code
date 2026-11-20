@@ -497,9 +497,10 @@ const cleanupFixture = (
                         }),
                       },
                     ]
-                  : outboxStatus !== null &&
-                      strings.join("").includes("orchestration_v2_effect_outbox")
-                    ? [{ status: outboxStatus }]
+                  : strings.join("").includes("orchestration_v2_effect_outbox")
+                    ? outboxStatus === null
+                      ? []
+                      : [{ status: outboxStatus, worktreePath: worktree }]
                     : strings.join("").includes("deleted_at IS NOT NULL")
                       ? deletedThreads.map((thread) => ({
                           payload_json: JSON.stringify(thread),
@@ -1640,6 +1641,115 @@ describe("deleted thread worktrees", () => {
         });
         expect(yield* fixture.fs.exists(fixture.worktree)).toBe(false);
       }).pipe(Effect.provide(cleanupTestLayer)),
+  );
+
+  it.live.each(["direct", "child", "side-chat"] as const)(
+    "keeps a shared worktree only for unresolved %s deletion effects",
+    (deletion) =>
+      runCleanupTest(
+        Effect.gen(function* () {
+          const sql = yield* SqlClient.SqlClient;
+          const fixture = yield* cleanupFixture(
+            {
+              ...DEFAULT_SERVER_SETTINGS.storageCleanup,
+              worktreeAfterDays: null,
+              worktreeSettledAfterDays: 0,
+              worktreeOnDelete: true,
+            },
+            sql,
+          );
+          const cascaded = deletion !== "direct";
+          const owner = shell({
+            branch: "feature",
+            worktreePath: fixture.worktree,
+            deletedAt: cascaded ? at(-DAY_MS) : null,
+            settledAt: at(-DAY_MS),
+          });
+          const child = subagent(owner, { deletedAt: at(-DAY_MS) });
+          fixture.setThreads(cascaded ? [] : [owner]);
+          const timestamp = DateTime.formatIso(at(0));
+          yield* sql`INSERT INTO projection_projects ${sql.insert({
+            project_id: owner.projectId,
+            title: "Shared worktree",
+            workspace_root: fixture.repo,
+            scripts_json: "[]",
+            created_at: timestamp,
+            updated_at: timestamp,
+          })}`;
+          for (const thread of [owner, child]) {
+            yield* sql`INSERT INTO orchestration_v2_projection_threads ${sql.insert({
+              thread_id: thread.id,
+              project_id: thread.projectId,
+              title: thread.title,
+              default_provider: "codex",
+              runtime_mode: thread.runtimeMode,
+              interaction_mode: thread.interactionMode,
+              created_at: timestamp,
+              updated_at: timestamp,
+              deleted_at: thread.deletedAt?.toString() ?? null,
+              payload_json: JSON.stringify(thread),
+            })}`;
+          }
+          const deletionId = "delete-command";
+          const archiveId = "old-archive-command";
+          for (const receipt of [
+            {
+              command_id: deletionId,
+              aggregate_id: cascaded ? owner.id : child.id,
+              command_type: "thread.delete",
+            },
+            { command_id: archiveId, aggregate_id: child.id, command_type: "thread.archive" },
+          ]) {
+            yield* sql`INSERT INTO orchestration_command_receipts ${sql.insert({
+              ...receipt,
+              aggregate_kind: "thread",
+              accepted_at: timestamp,
+              result_sequence: 1,
+              status: "accepted",
+            })}`;
+          }
+          const childDeletionId = cascaded ? `${deletionId}:${deletion}:${child.id}` : deletionId;
+          const cleanupEffectId = `effect:${childDeletionId}:terminal.cleanup`;
+          for (const effect of [
+            { effect_id: cleanupEffectId, command_id: childDeletionId, status: "pending" },
+            {
+              effect_id: `effect:${archiveId}:terminal.cleanup`,
+              command_id: archiveId,
+              status: "failed",
+            },
+          ]) {
+            yield* sql`INSERT INTO orchestration_v2_effect_outbox ${sql.insert({
+              ...effect,
+              thread_id: child.id,
+              effect_type: "terminal.cleanup",
+              payload_json: '{"type":"terminal.cleanup"}',
+              available_at: timestamp,
+              created_at: timestamp,
+              updated_at: timestamp,
+            })}`;
+          }
+
+          for (const status of ["pending", "failed"]) {
+            yield* sql`UPDATE orchestration_v2_effect_outbox SET status = ${status} WHERE effect_id = ${cleanupEffectId}`;
+            const report = yield* fixture.service.runNow;
+            expect(yield* fixture.fs.exists(fixture.worktree)).toBe(true);
+            expect(report.entries).toContainEqual(
+              expect.objectContaining({
+                threadId: owner.id,
+                outcome: "kept",
+                reason: "Thread deletion is still pending",
+              }),
+            );
+          }
+
+          yield* sql`UPDATE orchestration_v2_effect_outbox SET status = 'cancelled' WHERE effect_id = ${cleanupEffectId}`;
+          const report = yield* fixture.service.runNow;
+          expect(report.entries).toContainEqual(
+            expect.objectContaining({ threadId: owner.id, outcome: "removed" }),
+          );
+          expect(yield* fixture.fs.exists(fixture.worktree)).toBe(false);
+        }).pipe(Effect.provide(Sqlite.layerMemory)),
+      ),
   );
 
   it.effect("leaves a deleted owner's subagent on the owner's saved branch", () =>

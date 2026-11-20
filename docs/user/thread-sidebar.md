@@ -208,6 +208,14 @@ section is off. Each device keeps its own choice.
 Choose **Settle thread** from its menu to move finished work out of the active list
 without deleting the conversation. **Un-settle thread** restores it to active work
 and prevents automatic settlement until new activity resumes the usual rules.
+Manual settlement also settles the tasks the thread delegated in this environment, including
+nested tasks. A running turn, queued user input, a blocking approval or question, or background
+work still running in a delegated thread leaves every thread in its previous state. The refusal names the
+blocking thread. If an agent requests settlement during its own turn, the server can wait up to
+24 hours after the turn completes for delegated work to finish. Restarting the server clears
+the pending request. Tasks on linked machines keep running independently. Their late results remain
+readable, and reopening the parent does not replay a wake retired by settlement.
+
 Manually settling an idle thread dismisses unanswered async questions without
 sending an answer or restarting the agent. Settling also closes the thread's
 terminals that wait at an idle prompt, and keeps their output. A terminal that
@@ -364,8 +372,9 @@ instead.
 
 Closing a side chat you never sent a message in deletes it. To delete one you used,
 choose **Delete** at the top of the side chat. Deleting a thread also deletes its
-side chats. Archiving a thread also archives its side chats and stops their work, and
-unarchiving the thread brings them back.
+side chats and local delegated threads, including tasks those threads delegated. Ordinary forks
+and task threads in linked environments keep their history. Archiving a thread also archives
+its side chats and stops their work, and unarchiving the thread brings them back.
 
 On mobile, a thread lists its side chats above the composer. Tap one to open it and
 answer its questions.

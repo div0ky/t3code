@@ -1102,6 +1102,63 @@ it.effect("a task delegated to the box wakes the laptop's parent when it ends th
   ).pipe(Effect.provide(NodeHttpServer.layerTest)),
 );
 
+it.effect("keeps the linked thread readable after settling and deleting its local parent", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const peerThread = yield* makeBoxThread;
+      const peer = yield* serveBox(peerThread);
+      const offers = yield* SubscriptionRef.make<
+        ReadonlyArray<ProviderContinuationRequests.ProviderContinuationRequest>
+      >([]);
+      const local = yield* makeLaptop(
+        yield* SqlitePersistence.layerMemory.pipe(Layer.build),
+        offers,
+      );
+      yield* linkTo(local.links, peer, "full-access");
+      yield* seedParent(local);
+      const task = yield* delegateToBox(local);
+      const reply = "Review complete on the linked host.";
+      yield* Ref.set(peerThread.reply, reply);
+      yield* Ref.set(peerThread.status, "completed");
+      yield* Deferred.succeed(peerThread.finished, undefined);
+      expect((yield* taskResult(local, task.taskId))?.result).toBe(reply);
+
+      const [run] = (yield* local.projections.getThreadRecords(parentThreadId, ["runs"])).runs;
+      const now = yield* DateTime.now;
+      yield* local.sink.write({
+        events: [
+          {
+            id: EventId.make("linked-lifecycle:parent-completed"),
+            type: "run.updated",
+            threadId: parentThreadId,
+            runId: parentRunId,
+            occurredAt: now,
+            payload: { ...run!, status: "completed", completedAt: now },
+          },
+        ],
+      });
+      for (const type of ["thread.settle", "thread.delete"] as const) {
+        yield* local.orchestrator.dispatch({
+          type,
+          threadId: parentThreadId,
+          commandId: CommandId.make(type),
+        });
+        const history = yield* local.call(
+          "t3_thread_read",
+          {
+            environmentId: box.environmentId,
+            threadId: task.remoteChild.threadId,
+            view: "messages",
+          },
+          { ...parentScope, thread: undefined },
+        );
+        expect(history.isError, JSON.stringify(history.content)).toBe(false);
+        expect(JSON.stringify(history.structuredContent)).toContain(reply);
+      }
+    }),
+  ).pipe(Effect.provide(NodeHttpServer.layerTest)),
+);
+
 it.effect.each(["no active parent run", "a newer run owned by another provider"] as const)(
   "preserves remote observation guards with %s",
   (observer) =>

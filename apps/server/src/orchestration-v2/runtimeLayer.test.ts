@@ -7915,72 +7915,137 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
     }),
   );
 
-  it.effect("settles a thread its own agent settled once the turn completes", () =>
-    Effect.gen(function* () {
-      const orchestrator = yield* Orchestrator.OrchestratorV2;
-      const eventSink = yield* EventSink.EventSinkV2;
-      const threadManagement = yield* ThreadManagementService.ThreadManagementService;
-      const projectId = ProjectId.make("runtime-layer-settle-after-run-project");
-      const threadId = ThreadId.make("runtime-layer-settle-after-run-thread");
+  it.effect.each([false, true])(
+    "settles a thread its own agent settled once the turn completes (busy child: %s)",
+    (withChild) =>
+      Effect.gen(function* () {
+        const orchestrator = yield* Orchestrator.OrchestratorV2;
+        const eventSink = yield* EventSink.EventSinkV2;
+        const threadManagement = yield* ThreadManagementService.ThreadManagementService;
+        const prefix = withChild ? "settle-after-run-with-child" : "settle-after-run";
+        const projectId = ProjectId.make(`${prefix}:project`);
+        const threadId = ThreadId.make(`${prefix}:thread`);
+        yield* seedProject({
+          projectId,
+          title: "Settle after run",
+          workspaceRoot: process.cwd(),
+          defaultModelSelection: null,
+          createdAt: "2026-09-07T00:00:00.000Z",
+        });
 
-      yield* orchestrator.dispatch({
-        type: "thread.create",
-        createdBy: "user",
-        creationSource: "web",
-        commandId: CommandId.make("runtime-layer-settle-after-run-create"),
-        threadId,
-        projectId,
-        title: "Settle after run",
-        modelSelection,
-        runtimeMode: "full-access",
-        interactionMode: "default",
-        branch: null,
-        worktreePath: "/tmp/runtime-layer-settle-after-run",
-      });
-      yield* orchestrator.dispatch({
-        type: "message.dispatch",
-        createdBy: "user",
-        creationSource: "web",
-        commandId: CommandId.make("runtime-layer-settle-after-run-message"),
-        threadId,
-        messageId: MessageId.make("runtime-layer-settle-after-run-message"),
-        text: "Fix it and then settle this thread.",
-        attachments: [],
-        modelSelection,
-        dispatchMode: { type: "start_immediately" },
-      });
-      const run = (yield* orchestrator.getThreadProjection(threadId)).runs[0];
-      if (run === undefined) return yield* Effect.die(new Error("Run missing."));
+        yield* orchestrator.dispatch({
+          type: "thread.create",
+          createdBy: "user",
+          creationSource: "web",
+          commandId: CommandId.make(`${prefix}:create`),
+          threadId,
+          projectId,
+          title: "Settle after run",
+          modelSelection,
+          runtimeMode: "full-access",
+          interactionMode: "default",
+          branch: null,
+          worktreePath: null,
+        });
+        yield* orchestrator.dispatch({
+          type: "message.dispatch",
+          createdBy: "user",
+          creationSource: "web",
+          commandId: CommandId.make(`${prefix}:message`),
+          threadId,
+          messageId: MessageId.make(`${prefix}:message`),
+          text: "Fix it and then settle this thread.",
+          attachments: [],
+          modelSelection,
+          dispatchMode: { type: "start_immediately" },
+        });
+        const run = (yield* orchestrator.getThreadProjection(threadId)).runs[0];
+        if (run === undefined) return yield* Effect.die(new Error("Run missing."));
 
-      const settled = yield* orchestrator
-        .streamStoredEventsFrom({ threadId, afterSequence: 0, eventType: "thread.settled" })
-        .pipe(Stream.runHead, Effect.forkChild);
-      const result = yield* threadManagement.settleThread({
-        threadId,
-        commandId: CommandId.make("runtime-layer-settle-after-run-settle"),
-        byOwnAgent: true,
-      });
-      assert.deepEqual(result, { settlesWhenTurnEnds: true });
-      assert.isNull((yield* orchestrator.getThreadProjection(threadId)).thread.settledOverride);
-      const now = yield* DateTime.now;
-      yield* eventSink.write({
-        commandId: CommandId.make("runtime-layer-settle-after-run-completed"),
-        events: [
-          {
-            id: EventId.make("runtime-layer-settle-after-run-completed"),
-            type: "run.updated",
-            threadId,
-            runId: run.id,
-            occurredAt: now,
-            payload: { ...run, status: "completed", startedAt: now, completedAt: now },
-          },
-        ],
-      });
-      yield* Fiber.join(settled);
+        let childRun: typeof run | undefined;
+        if (withChild) {
+          const delegated = yield* orchestrator.dispatch({
+            type: "delegated_task.request",
+            createdBy: "agent",
+            creationSource: "mcp",
+            commandId: CommandId.make("settle-after-run-child"),
+            parentThreadId: threadId,
+            parentRunId: run.id,
+            parentNodeId: run.rootNodeId!,
+            task: "Finish the review",
+            completionWake: "settled_only",
+            modelSelection,
+            runtimeMode: "full-access",
+            interactionMode: "default",
+          });
+          const childId = delegated.storedEvents.find(
+            ({ event }) => event.type === "thread.created",
+          )!.event.threadId;
+          childRun = (yield* orchestrator.getThreadProjection(childId)).runs[0]!;
+        }
+        const waitingForChild = yield* Deferred.make<void>();
+        const stream = orchestrator.streamStoredEventsFrom;
+        using _observe = vi
+          .spyOn(orchestrator, "streamStoredEventsFrom")
+          .mockImplementation((input) =>
+            childRun !== undefined && input?.threadId === childRun.threadId
+              ? Stream.fromEffect(Deferred.succeed(waitingForChild, undefined)).pipe(
+                  Stream.drain,
+                  Stream.concat(stream(input)),
+                )
+              : stream(input),
+          );
+        const settled = yield* orchestrator
+          .streamStoredEventsFrom({ threadId, afterSequence: 0, eventType: "thread.settled" })
+          .pipe(Stream.runHead, Effect.forkChild);
+        const result = yield* threadManagement.settleThread({
+          threadId,
+          commandId: CommandId.make(`${prefix}:settle`),
+          byOwnAgent: true,
+        });
+        assert.deepEqual(result, { settlesWhenTurnEnds: true });
+        assert.isNull((yield* orchestrator.getThreadProjection(threadId)).thread.settledOverride);
+        const now = yield* DateTime.now;
+        yield* eventSink.write({
+          commandId: CommandId.make(`${prefix}:completed`),
+          events: [
+            {
+              id: EventId.make(`${prefix}:completed`),
+              type: "run.updated",
+              threadId,
+              runId: run.id,
+              occurredAt: now,
+              payload: { ...run, status: "completed", startedAt: now, completedAt: now },
+            },
+          ],
+        });
+        if (childRun !== undefined) {
+          yield* Deferred.await(waitingForChild);
+          assert.isNull((yield* orchestrator.getThreadProjection(threadId)).thread.settledAt);
+          yield* eventSink.write({
+            events: [
+              {
+                id: EventId.make("settle-after-run-child-completed"),
+                type: "run.updated",
+                threadId: childRun.threadId,
+                runId: childRun.id,
+                occurredAt: now,
+                payload: { ...childRun, status: "completed", completedAt: now },
+              },
+            ],
+          });
+        }
+        yield* Fiber.join(settled);
 
-      const projection = yield* orchestrator.getThreadProjection(threadId);
-      assert.equal(projection.thread.settledOverride, "settled");
-    }),
+        const projection = yield* orchestrator.getThreadProjection(threadId);
+        assert.equal(projection.thread.settledOverride, "settled");
+        if (childRun !== undefined) {
+          assert.equal(
+            (yield* orchestrator.getThreadProjection(childRun.threadId)).thread.settledOverride,
+            "settled",
+          );
+        }
+      }),
   );
 
   it.effect("keeps a pull request watch its agent started after asking to settle", () =>

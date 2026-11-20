@@ -690,6 +690,7 @@ it.effect.each([
   { status: "interrupted" as const, followUp: "none", settles: false },
   { status: "completed" as const, followUp: "notification", settles: true },
   { status: "completed" as const, followUp: "replayed-notification", settles: true },
+  { status: "completed" as const, followUp: "child-background-work", settles: true },
   { status: "completed" as const, followUp: "delegated", settles: true },
   { status: "completed" as const, followUp: "failed-notification", settles: false },
   { status: "completed" as const, followUp: "held-notification", settles: true },
@@ -743,7 +744,7 @@ it.effect.each([
               () =>
                 ({
                   thread: { id: threadId, projectId, deletedAt: null },
-                  runs: raced ? [...runs, nextRun] : runs,
+                  runs: raced && followUp !== "child-background-work" ? [...runs, nextRun] : runs,
                   messages: [
                     { id: MessageId.make("original"), runId, role: "user" as const },
                     {
@@ -783,6 +784,9 @@ it.effect.each([
                   commandId: command.commandId,
                   commandType: command.type,
                   cause: "Thread is still running",
+                  ...(followUp === "child-background-work"
+                    ? { blockedThreadId: ThreadId.make("busy-child") }
+                    : {}),
                 });
               }
               if (followUp === "replayed-notification" && command.commandId === rejectedCommandId) {
@@ -807,7 +811,11 @@ it.effect.each([
     const fiber = yield* service
       .settleAfterRun({ projectId, threadId, runId })
       .pipe(Effect.forkChild);
-    if (followUp !== "none") {
+    if (followUp === "child-background-work") {
+      yield* Deferred.await(subscribed);
+      expect(dispatched).toEqual([]);
+      yield* TestClock.adjust("1 minute");
+    } else if (followUp !== "none") {
       yield* Deferred.await(subscribed);
       expect(dispatched).toEqual([]);
       nextRun.status =

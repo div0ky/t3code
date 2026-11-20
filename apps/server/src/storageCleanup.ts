@@ -1350,22 +1350,46 @@ const make = Effect.gen(function* () {
           );
           const latest = bindings.filter((_binding, index) => bindingKeys[index] === worktreeKey);
           if (yield* hasTerminal(worktreePaths)) return waitForStop("open terminal");
-          if (deleted) {
-            if (
-              !resolveWorktreeCleanup(yield* settingsService.getSettings, thread.projectId)
-                .worktreeOnDelete
-            )
-              return "thread or cleanup settings changed since check";
-            // Durable deletion cleanup must succeed or be explicitly cancelled before removing its checkout.
-            const pendingCleanup = yield* sql<{ status: string }>`
-              SELECT status FROM orchestration_v2_effect_outbox
-              WHERE thread_id = ${thread.id} AND status NOT IN ('succeeded', 'cancelled')
-            `.pipe(NodeSqliteClient.readOnly);
-            // Failed effects never retry, so only running work can finish and free the path.
-            if (pendingCleanup.some((row) => row.status !== "failed"))
-              return waitForStop("thread deletion is still pending");
-            if (pendingCleanup.length > 0) return "thread deletion is still pending";
+          if (
+            deleted &&
+            !resolveWorktreeCleanup(yield* settingsService.getSettings, thread.projectId)
+              .worktreeOnDelete
+          )
+            return "thread or cleanup settings changed since check";
+          // Cascade effects use child command IDs, but only the root deletion has a receipt.
+          const pendingCleanup = yield* sql<{ worktreePath: string; status: string }>`
+            SELECT json_extract(t.payload_json, '$.worktreePath') AS "worktreePath", e.status
+            FROM orchestration_v2_effect_outbox e
+            JOIN orchestration_v2_projection_threads t ON t.thread_id = e.thread_id
+            WHERE e.status IN ('pending', 'running', 'failed')
+              AND t.deleted_at IS NOT NULL
+              AND json_extract(t.payload_json, '$.worktreePath') IS NOT NULL
+              AND EXISTS (
+                SELECT 1 FROM orchestration_command_receipts r
+                WHERE r.command_id IN (
+                  e.command_id,
+                  substr(e.command_id, 1, length(e.command_id) - length(':child:' || e.thread_id)),
+                  substr(e.command_id, 1, length(e.command_id) - length(':side-chat:' || e.thread_id))
+                )
+                  AND r.aggregate_kind = 'thread'
+                  AND r.command_type = 'thread.delete'
+                  AND r.status = 'accepted'
+                  AND (
+                    (e.command_id = r.command_id AND e.thread_id = r.aggregate_id)
+                    OR e.command_id IN (
+                      r.command_id || ':child:' || e.thread_id,
+                      r.command_id || ':side-chat:' || e.thread_id
+                    )
+                  )
+              )
+          `.pipe(NodeSqliteClient.readOnly);
+          let failedCleanup = false;
+          for (const row of pendingCleanup) {
+            if ((yield* canonical(row.worktreePath)) !== worktreeKey) continue;
+            if (row.status !== "failed") return waitForStop("thread deletion is still pending");
+            failedCleanup = true;
           }
+          if (failedCleanup) return "thread deletion is still pending";
           const latestShells = yield* Effect.forEach(latest, (entry) =>
             projections.getThreadShell(entry.threadId),
           );
