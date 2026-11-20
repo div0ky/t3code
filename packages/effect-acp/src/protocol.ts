@@ -353,6 +353,13 @@ export const makeAcpPatchedProtocol = Effect.fn("makeAcpPatchedProtocol")(functi
   const ensureActive = Ref.get(terminationHandled).pipe(
     Effect.flatMap((terminated) => (terminated ? Deferred.await(terminationFailure) : Effect.void)),
   );
+  const failClosedOutgoing = (detail: string) =>
+    Ref.get(outgoingWriterState).pipe(
+      Effect.flatMap(
+        ({ terminalError }) =>
+          terminalError ?? new AcpError.AcpTransportError({ detail, cause: "Output queue closed" }),
+      ),
+    );
 
   const logProtocol = (event: AcpProtocolLogEvent) => {
     if (event.direction === "incoming" && !options.logIncoming) {
@@ -439,13 +446,9 @@ export const makeAcpPatchedProtocol = Effect.fn("makeAcpPatchedProtocol")(functi
               cause,
             }),
         ),
-        Effect.filterOrFail(
+        Effect.filterOrElse(
           (accepted) => accepted,
-          () =>
-            new AcpError.AcpTransportError({
-              detail: "The ACP output queue was closed before accepting a message",
-              cause: "Output queue closed",
-            }),
+          () => failClosedOutgoing("The ACP output queue was closed before accepting a message"),
         ),
         Effect.tapError((error) =>
           acknowledgement === undefined
@@ -572,6 +575,16 @@ export const makeAcpPatchedProtocol = Effect.fn("makeAcpPatchedProtocol")(functi
         true,
       ] as const;
     }).pipe(Effect.flatten);
+
+  const classifyProcessTermination = (fallback: AcpError.AcpError) => {
+    if (!options.terminationError) return Effect.succeed(fallback);
+    // A broken pipe can precede Node's exit event, and stdio can also close while the child lives.
+    return options.terminationError.pipe(
+      Effect.timeoutOption("250 millis"),
+      Effect.provideService(Clock.Clock, Clock.Clock.defaultValue()),
+      Effect.map(Option.getOrElse(() => fallback)),
+    );
+  };
 
   const respondWithSuccess = (requestId: AcpError.AcpRequestId, value: unknown) =>
     offerOutgoing({
@@ -876,16 +889,9 @@ export const makeAcpPatchedProtocol = Effect.fn("makeAcpPatchedProtocol")(functi
         return handleTermination(() => Effect.succeed(normalized));
       },
       onSuccess: () =>
-        handleTermination(() => {
-          const ended = new AcpError.AcpInputStreamEndedError({});
-          if (!options.terminationError) return Effect.succeed(ended);
-          // Stdout can close without process exit; use a live-clock diagnostic grace period.
-          return options.terminationError.pipe(
-            Effect.timeoutOption("250 millis"),
-            Effect.provideService(Clock.Clock, Clock.Clock.defaultValue()),
-            Effect.map(Option.getOrElse(() => ended)),
-          );
-        }),
+        handleTermination(() =>
+          classifyProcessTermination(new AcpError.AcpInputStreamEndedError({})),
+        ),
     }),
     Effect.forkScoped,
   );
@@ -911,6 +917,14 @@ export const makeAcpPatchedProtocol = Effect.fn("makeAcpPatchedProtocol")(functi
       ),
       Effect.andThen(Queue.fail(outgoing, error)),
       Effect.asVoid,
+    );
+  const terminateOutgoingWriter = (fallback: AcpError.AcpError) =>
+    classifyProcessTermination(fallback).pipe(
+      Effect.flatMap((error) =>
+        failOutgoingWrites(error).pipe(
+          Effect.andThen(handleTermination(() => Effect.succeed(error))),
+        ),
+      ),
     );
   const completeOutgoingWrites = () =>
     Ref.modify(outgoingWriterState, (state) => {
@@ -956,13 +970,9 @@ export const makeAcpPatchedProtocol = Effect.fn("makeAcpPatchedProtocol")(functi
               : "Failed to write an outgoing ACP message",
             cause,
           });
-          return failOutgoingWrites(error).pipe(
-            Effect.andThen(
-              Cause.hasInterruptsOnly(cause)
-                ? Effect.void
-                : handleTermination(() => Effect.succeed(error)),
-            ),
-          );
+          return Cause.hasInterruptsOnly(cause)
+            ? failOutgoingWrites(error)
+            : terminateOutgoingWriter(error);
         },
         onSuccess: () =>
           Ref.get(outgoingWriterState).pipe(
@@ -974,9 +984,7 @@ export const makeAcpPatchedProtocol = Effect.fn("makeAcpPatchedProtocol")(functi
                       detail: "ACP output writer ended before the protocol closed",
                       cause: "Output writer ended",
                     });
-                    return failOutgoingWrites(error).pipe(
-                      Effect.andThen(handleTermination(() => Effect.succeed(error))),
-                    );
+                    return terminateOutgoingWriter(error);
                   })();
               return handled.pipe(
                 Effect.andThen(
@@ -1085,13 +1093,9 @@ export const makeAcpPatchedProtocol = Effect.fn("makeAcpPatchedProtocol")(functi
             cause,
           }),
       ),
-      Effect.filterOrFail(
+      Effect.filterOrElse(
         (accepted) => accepted,
-        () =>
-          new AcpError.AcpTransportError({
-            detail: "The ACP output queue was closed before accepting a notification",
-            cause: "Output queue closed",
-          }),
+        () => failClosedOutgoing("The ACP output queue was closed before accepting a notification"),
       ),
     );
   });
